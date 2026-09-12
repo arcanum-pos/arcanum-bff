@@ -1,0 +1,20 @@
+{
+  "name": "questo-bff",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc",
+    "tail": "wrangler tail",
+    "secret:put": "wrangler secret put",
+    "kv:put": "wrangler kv:key put --binding=SESSIONS",
+    "kv:get": "wrangler kv:key get --binding=SESSIONS",
+    "kv:list": "wrangler kv:key list --binding=SESSIONS"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240405.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.83.0"
+  }
+}

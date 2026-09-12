@@ -1,0 +1,43 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "wrk-questo-bff",
+	"workers_dev": true,
+	"main": "src/index.ts",
+	"compatibility_date": "2025-07-18",
+	"dev": {
+		"port": 8787
+	},
+	"kv_namespaces": [
+		{
+			"binding": "SESSIONS",
+			// Replace with the id printed by `npx wrangler kv namespace create SESSIONS` (see README).
+			"id": "REPLACE_WITH_SESSIONS_KV_ID"
+		}
+	],
+	"services": [
+		{ "binding": "BANCONTACT_SERVICE", "service": "questo-bancontact-worker" },
+		{ "binding": "WEBAPP_SERVICE", "service": "questo-webapp" }
+	],
+	"observability": {
+		"enabled": true
+	},
+	"version_metadata": {
+		"binding": "CF_VERSION_METADATA"
+	},
+	"upload_source_maps": true,
+	"vars": {
+		// Replace with your new Auth0 tenant's domain, e.g. "your-tenant.eu.auth0.com".
+		"AUTH0_DOMAIN": "REPLACE_WITH_NEW_AUTH0_TENANT_DOMAIN",
+		"SESSION_TTL": 604800,
+		"FRONTEND_URL": "https://elewijtsepijl.esvvzw.be"
+		// No AUDIENCE var: we deliberately don't request an Auth0-API-scoped access token.
+		// Authorization (who can do what) is handled inside the app, not via Auth0 permissions/scopes.
+		// COOKIE_DOMAIN and ALLOWED_ORIGINS are not needed: UI and API are same-origin behind this BFF.
+	},
+	"routes": [
+		{
+			"pattern": "elewijtsepijl.esvvzw.be",
+			"custom_domain": true
+		}
+	]
+}
