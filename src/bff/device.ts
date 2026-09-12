@@ -4,7 +4,6 @@ import type { SessionStore } from './session';
 export interface DeviceFlowSettings {
   clientId: string;
   clientSecret: string;
-  connection?: string;
   endpoints: OAuthEndpoints;
 }
 
@@ -24,7 +23,6 @@ export type DevicePollResult =
 export class DeviceFlowHandler {
   private clientId: string;
   private clientSecret: string;
-  private connection?: string;
   private deviceCodeEndpoint: string;
   private tokenEndpoint: string;
   private userinfoEndpoint: string;
@@ -32,20 +30,21 @@ export class DeviceFlowHandler {
   constructor(private sessionStore: SessionStore, settings: DeviceFlowSettings) {
     this.clientId = settings.clientId;
     this.clientSecret = settings.clientSecret;
-    this.connection = settings.connection;
     this.deviceCodeEndpoint = settings.endpoints.deviceCodeEndpoint;
     this.tokenEndpoint = settings.endpoints.tokenEndpoint;
     this.userinfoEndpoint = settings.endpoints.userinfoEndpoint;
   }
 
   async start(): Promise<DeviceStartResult | { error: string }> {
+    // Note: unlike /authorize, Auth0's /oauth/device/code endpoint does not support a
+    // `connection` param (only client_id, scope, audience are documented) — passing one
+    // here caused login failures once a fresh authentication was actually required.
+    // Which connections show up on the confirmation page is governed entirely by what's
+    // enabled for this Application in the Auth0 dashboard.
     const params = new URLSearchParams({
       client_id: this.clientId,
       scope: 'openid profile email offline_access',
     });
-    if (this.connection) {
-      params.set('connection', this.connection);
-    }
 
     const response = await fetch(this.deviceCodeEndpoint, {
       method: 'POST',

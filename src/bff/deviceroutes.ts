@@ -20,7 +20,6 @@ export class DeviceRoutesHandler {
     this.device = new DeviceFlowHandler(this.sessionStore, {
       clientId: env.OAUTH_CLIENT_ID,
       clientSecret: env.OAUTH_CLIENT_SECRET,
-      connection: env.OAUTH_CONNECTION,
       endpoints: getOAuthEndpoints(env),
     });
   }
