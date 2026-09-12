@@ -23,6 +23,13 @@ export class AuthRoutesHandler {
     const path = url.pathname;
 
     if (path === '/login') {
+      if (!(await this.checkRateLimit(request))) {
+        return new Response('Te veel aanmeldpogingen. Probeer over een minuut opnieuw.', {
+          status: 429,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
+      }
+
       const [authUrl, state] = await this.oauth.login();
       return new Response(null, {
         status: 302,
@@ -78,6 +85,13 @@ export class AuthRoutesHandler {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  private async checkRateLimit(request: Request): Promise<boolean> {
+    if (!this.env.LOGIN_RATE_LIMITER) return true;
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const { success } = await this.env.LOGIN_RATE_LIMITER.limit({ key: ip });
+    return success;
   }
 }
 

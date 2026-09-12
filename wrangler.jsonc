@@ -23,6 +23,16 @@
 			"service": "questo-webapp"
 		}
 	],
+	"ratelimits": [
+		{
+			"name": "LOGIN_RATE_LIMITER",
+			"namespace_id": "1002",
+			"simple": {
+				"limit": 5,
+				"period": 60
+			}
+		}
+	],
 	"observability": {
 		"enabled": true
 	},

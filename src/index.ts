@@ -73,11 +73,17 @@ export default {
 
     // All other paths → UI (gated behind auth)
     if (auth.authMethod === 'public') {
-      // Only redirect browsers to login; scanners and API clients that reach here get 401.
+      // Only show browsers a login prompt; scanners and API clients get 401.
       if (!request.headers.get('Accept')?.includes('text/html')) {
         return new Response(null, { status: 401 });
       }
-      return new Response(null, { status: 302, headers: { Location: '/login' } });
+      // Deliberately a link, not an automatic 302 to /login: that redirect used to
+      // fire for every anonymous request to any page — including scanner/bot noise
+      // that never even knew /login existed — and /login creates a KV-backed PKCE
+      // session on every hit. That silently burned through the Workers KV free-tier
+      // daily write quota. Requiring an actual click means only a real login attempt
+      // costs a KV write.
+      return new Response(LOGIN_PROMPT_HTML, { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
     const uiProxy = new UIFrontendProxy(env);
     return uiProxy.handleRequest(request, path);
@@ -104,6 +110,16 @@ function corsResponse(response: Response, request: Request, env: Env): Response 
   out.headers.set('Vary', 'Origin');
   return out;
 }
+
+const LOGIN_PROMPT_HTML = `<!DOCTYPE html>
+<html lang="nl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aanmelden vereist</title>
+<style>body{font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;background:#f5f5f5}
+a{display:inline-block;padding:.75rem 1.5rem;background:#1a73e8;color:#fff;text-decoration:none;border-radius:.5rem;font-weight:600}</style>
+</head>
+<body><a href="/login">Aanmelden om verder te gaan</a></body>
+</html>`;
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
