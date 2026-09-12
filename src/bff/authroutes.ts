@@ -12,6 +12,7 @@ export class AuthRoutesHandler {
       OAUTH_CLIENT_SECRET: env.OAUTH_CLIENT_SECRET,
       FRONTEND_URL: env.FRONTEND_URL,
       REDIRECT_URI: `${env.FRONTEND_URL}/callback`,
+      OAUTH_CONNECTION: env.OAUTH_CONNECTION,
       endpoints: getOAuthEndpoints(env),
     });
   }

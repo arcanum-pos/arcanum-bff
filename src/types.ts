@@ -18,6 +18,11 @@ export interface Env {
   // Auth0 config (wrangler.jsonc vars)
   AUTH0_DOMAIN: string;
   SESSION_TTL: number;
+  // Forces login straight to this Auth0 connection (e.g. an enterprise connection
+  // like a Google Workspace connection), skipping Auth0's own connection picker.
+  // Unset this to let Auth0 show its default picker again (e.g. once multiple
+  // connections/orgs exist).
+  OAUTH_CONNECTION?: string;
   // Secrets (.dev.vars / wrangler secret put)
   OAUTH_CLIENT_ID: string;
   OAUTH_CLIENT_SECRET: string;
@@ -65,6 +70,7 @@ export interface OAuthSettings {
   OAUTH_CLIENT_SECRET: string;
   FRONTEND_URL: string;
   REDIRECT_URI: string;
+  OAUTH_CONNECTION?: string;
   endpoints: OAuthEndpoints;
 }
 

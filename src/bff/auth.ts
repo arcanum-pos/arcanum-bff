@@ -8,6 +8,7 @@ export class OAuthHandler {
   private authEndpoint: string;
   private tokenEndpoint: string;
   private userinfoEndpoint: string;
+  private connection?: string;
 
   constructor(private sessionStore: SessionStore, settings: OAuthSettings) {
     this.clientId = settings.OAUTH_CLIENT_ID;
@@ -16,6 +17,7 @@ export class OAuthHandler {
     this.authEndpoint = settings.endpoints.authEndpoint;
     this.tokenEndpoint = settings.endpoints.tokenEndpoint;
     this.userinfoEndpoint = settings.endpoints.userinfoEndpoint;
+    this.connection = settings.OAUTH_CONNECTION;
   }
 
   async login(): Promise<[string, string]> {
@@ -36,6 +38,10 @@ export class OAuthHandler {
       code_challenge_method: 'S256',
       state: tempSessionId,
     });
+
+    if (this.connection) {
+      params.set('connection', this.connection);
+    }
 
     const authUrl = `${this.authEndpoint}?${params.toString()}`;
     return [authUrl, tempSessionId];
