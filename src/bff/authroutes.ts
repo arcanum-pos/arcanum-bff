@@ -58,10 +58,17 @@ export class AuthRoutesHandler {
         await this.sessionStore.delete(sessionId);
       }
 
+      // Clearing our own session isn't enough — Auth0 keeps its own SSO session
+      // cookie, so without this the next /login would silently re-authenticate
+      // via that session instead of prompting again.
+      const auth0LogoutUrl = new URL(`https://${this.env.AUTH0_DOMAIN}/v2/logout`);
+      auth0LogoutUrl.searchParams.set('client_id', this.env.OAUTH_CLIENT_ID);
+      auth0LogoutUrl.searchParams.set('returnTo', this.env.FRONTEND_URL);
+
       return new Response(null, {
         status: 302,
         headers: {
-          Location: this.env.FRONTEND_URL,
+          Location: auth0LogoutUrl.toString(),
           'Set-Cookie': 'session_id=; Path=/; HttpOnly; Max-Age=0',
         },
       });
