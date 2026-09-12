@@ -2,6 +2,7 @@ import type { Env, SessionData } from '../types';
 import { getOAuthEndpoints } from '../types';
 import type { SessionStore } from './session';
 import { OAuthHandler } from './auth';
+import { buildSessionCookie } from './cookie';
 
 export class AuthRoutesHandler {
   private oauth: OAuthHandler;
@@ -43,19 +44,11 @@ export class AuthRoutesHandler {
         });
       }
 
-      const newSessionId = await this.sessionStore.create(userSessionData satisfies SessionData, 604800);
-      const isDevelopment = this.env.FRONTEND_URL?.includes('localhost') || this.env.FRONTEND_URL?.includes('127.0.0.1');
-
-      const cookieBase = `session_id=${newSessionId}; Path=/; HttpOnly; Max-Age=604800`;
-      const cookieValue = isDevelopment
-        ? cookieBase
-        : this.env.COOKIE_DOMAIN
-          ? `${cookieBase}; Domain=${this.env.COOKIE_DOMAIN}; Secure; SameSite=None`
-          : `${cookieBase}; Secure; SameSite=None`;
+      const newSessionId = await this.sessionStore.create(userSessionData satisfies SessionData, this.env.SESSION_TTL);
 
       return new Response(null, {
         status: 302,
-        headers: { Location: this.env.FRONTEND_URL, 'Set-Cookie': cookieValue },
+        headers: { Location: this.env.FRONTEND_URL, 'Set-Cookie': buildSessionCookie(this.env, newSessionId) },
       });
     }
 

@@ -1,6 +1,7 @@
 import type { Env } from './types';
 import { CloudflareKVSessionStore } from './adapters/kv_session_store';
 import { AuthRoutesHandler } from './bff/authroutes';
+import { DeviceRoutesHandler } from './bff/deviceroutes';
 import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
 import { Router, isKnownApiRoute } from './routes/router';
@@ -43,6 +44,14 @@ export default {
     if (path === '/login' || path === '/callback' || path === '/logout') {
       const authHandler = new AuthRoutesHandler(sessionStore, env);
       return authHandler.processAuthRoute(request);
+    }
+
+    // Device Authorization Grant: a kiosk device shows a QR/code, the user completes
+    // login on their own phone, the kiosk polls until done. Public — no session/cookie
+    // needed to start or poll, since the whole point is authenticating this device.
+    if (path === '/device' || path.startsWith('/device/')) {
+      const deviceHandler = new DeviceRoutesHandler(sessionStore, env);
+      return deviceHandler.processDeviceRoute(request);
     }
 
     const auth = await authresult(request, env, sessionStore);

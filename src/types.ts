@@ -59,10 +59,16 @@ export interface PkceSessionData {
   type: 'oauth_pkce';
 }
 
+export interface DevicePollSessionData {
+  deviceCode: string;
+  type: 'device_poll';
+}
+
 export interface OAuthEndpoints {
   authEndpoint: string;
   tokenEndpoint: string;
   userinfoEndpoint: string;
+  deviceCodeEndpoint: string;
 }
 
 export interface OAuthSettings {
@@ -94,5 +100,6 @@ export function getOAuthEndpoints(env: Env): OAuthEndpoints {
     authEndpoint: `https://${domain}/authorize`,
     tokenEndpoint: `https://${domain}/oauth/token`,
     userinfoEndpoint: `https://${domain}/userinfo`,
+    deviceCodeEndpoint: `https://${domain}/oauth/device/code`,
   };
 }
