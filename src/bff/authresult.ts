@@ -19,7 +19,7 @@ export async function authresult(request: Request, env: Env, sessionStore: Sessi
     let sessionData = await getSessionData(sessionStore, sessionId);
 
     if (validateSessionData(sessionData)) {
-      if (isTokenExpiringSoon(sessionData.access_token, 30)) {
+      if (isTokenExpiringSoon(sessionData.expires_at, 30)) {
         const refreshed = await refreshUserToken(sessionData, sessionId, sessionStore, env);
         if (refreshed) {
           sessionData = await getSessionData(sessionStore, sessionId);

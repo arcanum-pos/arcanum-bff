@@ -2,18 +2,15 @@ import type { SessionData, Env } from '../types';
 import { getOAuthEndpoints } from '../types';
 import type { SessionStore } from './session';
 
-export function isTokenExpiringSoon(accessToken: string, secondsThreshold = 30): boolean {
-  try {
-    const payloadBase64 = accessToken.split('.')[1];
-    let base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4) base64 += '=';
-
-    const payload = JSON.parse(atob(base64)) as { exp?: number };
-    const exp = (payload.exp ?? 0) * 1000;
-    return Date.now() + secondsThreshold * 1000 >= exp;
-  } catch {
-    return true; // safer to refresh if we can't check
-  }
+// Takes SessionData's own `expires_at` (set from the token response's `expires_in`
+// at login/refresh time — see auth.ts/device.ts/refresh.ts) rather than decoding
+// access_token as a JWT: since this app never sends an `audience` param, Auth0
+// issues an *opaque* access token here, not a JWT. Decoding it as one always threw,
+// and the old catch-and-assume-expired fallback meant every single authenticated
+// request forced a token refresh (and a KV write) — this is almost certainly what
+// was driving the Workers KV write quota, not attack traffic.
+export function isTokenExpiringSoon(expiresAt: number, secondsThreshold = 30): boolean {
+  return Date.now() / 1000 + secondsThreshold >= expiresAt;
 }
 
 export async function refreshUserToken(
