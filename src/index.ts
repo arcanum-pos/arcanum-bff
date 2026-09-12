@@ -38,7 +38,7 @@ export default {
       return corsResponse(jsonResponse({ error: 'Not found' }, 404), request, env);
     }
 
-    const sessionStore = new CloudflareKVSessionStore(env.SESSIONS);
+    const sessionStore = new CloudflareKVSessionStore(env.QUESTO_SESSIONS);
 
     if (path === '/login' || path === '/callback' || path === '/logout') {
       const authHandler = new AuthRoutesHandler(sessionStore, env);

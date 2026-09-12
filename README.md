@@ -50,11 +50,10 @@ npm install
 ### 3. Create the sessions KV namespace
 
 ```bash
-npx wrangler kv namespace create SESSIONS
+npx wrangler kv namespace create QUESTO_SESSIONS
 ```
 
-This prints an `id`. Put it into `wrangler.jsonc`, replacing
-`REPLACE_WITH_SESSIONS_KV_ID`.
+This prints an `id`. Put it into `wrangler.jsonc`'s `kv_namespaces` entry.
 
 ### 4. Set the Auth0 domain
 

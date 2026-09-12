@@ -11,7 +11,7 @@ export interface NormalizedIdentity {
 
 export interface Env {
   // KV namespaces
-  SESSIONS: KVNamespace;
+  QUESTO_SESSIONS: KVNamespace;
   // Service bindings
   WEBAPP_SERVICE: Fetcher;
   BANCONTACT_SERVICE: Fetcher;

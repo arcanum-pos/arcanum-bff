@@ -9,14 +9,19 @@
 	},
 	"kv_namespaces": [
 		{
-			"binding": "SESSIONS",
-			// Replace with the id printed by `npx wrangler kv namespace create SESSIONS` (see README).
-			"id": "REPLACE_WITH_SESSIONS_KV_ID"
+			"binding": "QUESTO_SESSIONS",
+			"id": "9c4625a8e89b46a4a37bbd48bd1a2abe"
 		}
 	],
 	"services": [
-		{ "binding": "BANCONTACT_SERVICE", "service": "questo-bancontact-worker" },
-		{ "binding": "WEBAPP_SERVICE", "service": "questo-webapp" }
+		{
+			"binding": "BANCONTACT_SERVICE",
+			"service": "questo-bancontact-worker"
+		},
+		{
+			"binding": "WEBAPP_SERVICE",
+			"service": "questo-webapp"
+		}
 	],
 	"observability": {
 		"enabled": true
@@ -27,7 +32,7 @@
 	"upload_source_maps": true,
 	"vars": {
 		// Replace with your new Auth0 tenant's domain, e.g. "your-tenant.eu.auth0.com".
-		"AUTH0_DOMAIN": "REPLACE_WITH_NEW_AUTH0_TENANT_DOMAIN",
+		"AUTH0_DOMAIN": "auth.esvvzw.be",
 		"SESSION_TTL": 604800,
 		"FRONTEND_URL": "https://elewijtsepijl.esvvzw.be"
 		// No AUDIENCE var: we deliberately don't request an Auth0-API-scoped access token.
