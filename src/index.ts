@@ -109,6 +109,6 @@ function isScannedPath(path: string): boolean {
   const extMatch = path.match(/\.([a-zA-Z0-9]+)$/);
   if (!extMatch) return false;
   const ext = extMatch[1].toLowerCase();
-  const ALLOWED = new Set(['js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'woff', 'woff2', 'ttf', 'eot', 'map']);
+  const ALLOWED = new Set(['html', 'js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'woff', 'woff2', 'ttf', 'eot', 'map']);
   return !ALLOWED.has(ext);
 }
