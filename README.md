@@ -1,5 +1,7 @@
 # questo-bff
 
+check deployment with commit
+
 Backend-for-frontend for the Elewijtse Pijl app. Single front door on
 `elewijtsepijl.esvvzw.be`: handles login against Auth0 (Google Workspace
 connection), then proxies everything else — the static webapp UI and the
