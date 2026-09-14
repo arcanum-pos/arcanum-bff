@@ -4,7 +4,7 @@ import { AuthRoutesHandler } from './bff/authroutes';
 import { DeviceRoutesHandler } from './bff/deviceroutes';
 import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
-import { Router, isKnownApiRoute } from './routes/router';
+import { Router, isKnownApiRoute, routeRequiresAuth } from './routes/router';
 import { UIFrontendProxy } from './services/uiProxy';
 
 export default {
@@ -62,7 +62,7 @@ export default {
     }
 
     if (path.startsWith('/api')) {
-      if (auth.authMethod === 'public') {
+      if (auth.authMethod === 'public' && routeRequiresAuth(path)) {
         return corsResponse(jsonResponse({ error: 'Unauthorized' }, 401), request, env);
       }
       const router = new Router(env, auth);

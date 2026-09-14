@@ -19,6 +19,7 @@ export interface Env {
   // Service bindings
   WEBAPP_SERVICE: Fetcher;
   BANCONTACT_SERVICE: Fetcher;
+  DEVICEHUB_SERVICE: Fetcher;
   // Auth0 config (wrangler.jsonc vars)
   AUTH0_DOMAIN: string;
   SESSION_TTL: number;
@@ -35,6 +36,7 @@ export interface Env {
   // where service bindings are used instead)
   UIPROXY_URL?: string;
   BANCONTACT_LOCAL_URL?: string;
+  DEVICEHUB_LOCAL_URL?: string;
   // Optional cookie domain, e.g. ".example.com", only needed if the BFF and another
   // subdomain need to share a session cookie
   COOKIE_DOMAIN?: string;

@@ -13,8 +13,8 @@
     "kv:list": "wrangler kv:key list --binding=QUESTO_SESSIONS"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240405.0",
+    "@cloudflare/workers-types": "^5.20260911.1",
     "typescript": "^5.9.3",
-    "wrangler": "^4.83.0"
+    "wrangler": "^4.131.1"
   }
 }

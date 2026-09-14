@@ -14,3 +14,6 @@ UIPROXY_URL=http://localhost:8788
 
 # Local `wrangler dev` URL for the questo-bancontact-worker (run it on a different port).
 BANCONTACT_LOCAL_URL=http://localhost:8789
+
+# Local `wrangler dev` URL for the questo-devicehub Worker (run it on a different port).
+DEVICEHUB_LOCAL_URL=http://localhost:8790

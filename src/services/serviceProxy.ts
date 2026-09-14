@@ -58,7 +58,7 @@ export class ServiceProxy {
 
       const originalUrl = new URL(request.url);
       const targetPath = this.applyRewritePath(originalUrl.pathname, options.rewritePath);
-      const fullUrl = `${options.local_url}${targetPath}`;
+      const fullUrl = `${options.local_url}${targetPath}${originalUrl.search}`;
 
       const headers = new Headers(request.headers);
       if (token) headers.set('Authorization', `Bearer ${token}`);

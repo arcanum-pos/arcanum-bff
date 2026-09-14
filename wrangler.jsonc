@@ -21,6 +21,10 @@
 		{
 			"binding": "WEBAPP_SERVICE",
 			"service": "questo-webapp"
+		},
+		{
+			"binding": "DEVICEHUB_SERVICE",
+			"service": "questo-devicehub"
 		}
 	],
 	"ratelimits": [
