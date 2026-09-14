@@ -9,6 +9,7 @@ export class OAuthHandler {
   private tokenEndpoint: string;
   private userinfoEndpoint: string;
   private connection?: string;
+  private issuerUrl: string;
 
   constructor(private sessionStore: SessionStore, settings: OAuthSettings) {
     this.clientId = settings.OAUTH_CLIENT_ID;
@@ -18,14 +19,15 @@ export class OAuthHandler {
     this.tokenEndpoint = settings.endpoints.tokenEndpoint;
     this.userinfoEndpoint = settings.endpoints.userinfoEndpoint;
     this.connection = settings.OAUTH_CONNECTION;
+    this.issuerUrl = settings.issuerUrl;
   }
 
-  async login(): Promise<[string, string]> {
+  async login(orgId: string): Promise<[string, string]> {
     const codeVerifier = this._generateCodeVerifier();
     const codeChallenge = await this._generateCodeChallenge(codeVerifier);
 
     const tempSessionId = await this.sessionStore.create(
-      { codeVerifier, type: 'oauth_pkce' } satisfies PkceSessionData,
+      { codeVerifier, type: 'oauth_pkce', orgId } satisfies PkceSessionData,
       600
     );
 
@@ -56,7 +58,7 @@ export class OAuthHandler {
         return [null, 'Invalid or expired state'];
       }
 
-      const { codeVerifier } = tempData;
+      const { codeVerifier, orgId } = tempData;
 
       const tokenResponse = await fetch(this.tokenEndpoint, {
         method: 'POST',
@@ -103,6 +105,8 @@ export class OAuthHandler {
         email: userInfo.email ?? '',
         name: userInfo.name ?? '',
         expires_at: Date.now() / 1000 + token.expires_in,
+        orgId,
+        issuer: this.issuerUrl,
       };
 
       await this.sessionStore.delete(state);

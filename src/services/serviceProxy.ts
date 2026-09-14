@@ -45,6 +45,7 @@ export class ServiceProxy {
     if (!identity) return;
     if (identity.email) headers.set('X-User-Email', identity.email);
     if (identity.sub) headers.set('X-User-Sub', identity.sub);
+    if (identity.issuer) headers.set('X-User-Issuer', identity.issuer);
     if (identity.name) headers.set('X-User-Name', identity.name);
     if (identity.roles.length > 0) headers.set('X-User-Roles', identity.roles.join(','));
   }

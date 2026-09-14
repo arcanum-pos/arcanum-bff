@@ -1,3 +1,5 @@
+import { callWorker } from './services/workerClient';
+
 export interface NormalizedIdentity {
   sub: string;
   email: string;
@@ -6,7 +8,10 @@ export interface NormalizedIdentity {
   lastName: string;
   username: string;
   roles: string[];
-  provider: 'auth0';
+  // Which issuer authenticated this identity — see worker's
+  // memberships.issuer for why bare sub isn't enough once an org can bring
+  // its own identity provider.
+  issuer: string;
 }
 
 export interface Env {
@@ -20,18 +25,26 @@ export interface Env {
   WEBAPP_SERVICE: Fetcher;
   BANCONTACT_SERVICE: Fetcher;
   DEVICEHUB_SERVICE: Fetcher;
-  // Auth0 config (wrangler.jsonc vars)
+  // Still used by authresult.ts's Bearer-token auth path (validateAuth0Bearer)
+  // — deliberately scoped to the platform's one original tenant only, not
+  // yet multi-issuer-aware. Everything else (login, device, refresh,
+  // logout) now resolves via resolveIdpSettings instead.
   AUTH0_DOMAIN: string;
   SESSION_TTL: number;
-  // Forces login straight to this Auth0 connection (e.g. an enterprise connection
-  // like a Google Workspace connection), skipping Auth0's own connection picker.
-  // Unset this to let Auth0 show its default picker again (e.g. once multiple
-  // connections/orgs exist).
+  // No longer read anywhere as of the multi-issuer identity-provider work
+  // (resolveIdpSettings replaces all of it) — left declared/deployed until
+  // they're formally deleted, so removal is its own deliberate step rather
+  // than an accidental side effect of this change.
   OAUTH_CONNECTION?: string;
-  // Secrets (.dev.vars / wrangler secret put)
   OAUTH_CLIENT_ID: string;
   OAUTH_CLIENT_SECRET: string;
   FRONTEND_URL: string;
+  // Authorizes calls to worker's internal-only identity-provider-resolution
+  // route (see services/workerClient.ts) — must match worker's own
+  // BFF_INTERNAL_KEY secret. Deliberately separate from worker's own
+  // INTERNAL_API_KEY (which authorizes its calls to questo-devicehub) —
+  // a different pairwise relationship, independently rotatable.
+  BFF_INTERNAL_KEY: string;
   // Local `wrangler dev` HTTP fallbacks (set via .dev.vars only, unused in production
   // where service bindings are used instead)
   UIPROXY_URL?: string;
@@ -58,16 +71,25 @@ export interface SessionData {
   email: string;
   name: string;
   expires_at: number;
+  // Which org's identity provider authenticated this session ('default'
+  // until per-org routing exists), and that provider's real issuer URL —
+  // recorded once at /callback or /device/poll time, never re-derived from
+  // a token afterward. Needed to resolve the right settings again later
+  // (refresh, logout) and to forward X-User-Issuer to worker.
+  orgId: string;
+  issuer: string;
 }
 
 export interface PkceSessionData {
   codeVerifier: string;
   type: 'oauth_pkce';
+  orgId: string;
 }
 
 export interface DevicePollSessionData {
   deviceCode: string;
   type: 'device_poll';
+  orgId: string;
 }
 
 export interface OAuthEndpoints {
@@ -75,6 +97,7 @@ export interface OAuthEndpoints {
   tokenEndpoint: string;
   userinfoEndpoint: string;
   deviceCodeEndpoint: string;
+  endSessionEndpoint?: string;
 }
 
 export interface OAuthSettings {
@@ -83,6 +106,7 @@ export interface OAuthSettings {
   FRONTEND_URL: string;
   REDIRECT_URI: string;
   OAUTH_CONNECTION?: string;
+  issuerUrl: string;
   endpoints: OAuthEndpoints;
 }
 
@@ -100,12 +124,51 @@ export function isSessionData(data: SessionData | NormalizedIdentity | string): 
   return typeof data === 'object' && 'access_token' in data;
 }
 
-export function getOAuthEndpoints(env: Env): OAuthEndpoints {
-  const domain = env.AUTH0_DOMAIN;
+// What questo-bff needs to actually drive a login for one org: that org's
+// own configured identity provider if it has one, otherwise the platform
+// default's (resolved by worker — see worker/src/organizations/
+// identity-providers.ts resolveIdentityProviderForAuth). No discovery fetch
+// happens here: worker already resolved and persisted the endpoints at
+// admin-save time, so this is just a service-binding round trip.
+export interface IdpSettings {
+  issuerUrl: string;
+  clientId: string;
+  clientSecret: string;
+  connectionName?: string;
+  endpoints: OAuthEndpoints;
+}
+
+export async function resolveIdpSettings(orgId: string, env: Env): Promise<IdpSettings> {
+  const res = await callWorker(env, `/organizations/${encodeURIComponent(orgId)}/identity-provider/resolve`);
+  if (!res.ok) {
+    throw new Error(`Failed to resolve identity provider for org '${orgId}': ${res.status}`);
+  }
+
+  const data = (await res.json()) as {
+    issuerUrl: string;
+    clientId: string;
+    clientSecret: string;
+    connectionName: string | null;
+    endpoints: {
+      authorization_endpoint: string;
+      token_endpoint: string;
+      userinfo_endpoint: string;
+      device_authorization_endpoint: string;
+      end_session_endpoint: string | null;
+    };
+  };
+
   return {
-    authEndpoint: `https://${domain}/authorize`,
-    tokenEndpoint: `https://${domain}/oauth/token`,
-    userinfoEndpoint: `https://${domain}/userinfo`,
-    deviceCodeEndpoint: `https://${domain}/oauth/device/code`,
+    issuerUrl: data.issuerUrl,
+    clientId: data.clientId,
+    clientSecret: data.clientSecret,
+    connectionName: data.connectionName ?? undefined,
+    endpoints: {
+      authEndpoint: data.endpoints.authorization_endpoint,
+      tokenEndpoint: data.endpoints.token_endpoint,
+      userinfoEndpoint: data.endpoints.userinfo_endpoint,
+      deviceCodeEndpoint: data.endpoints.device_authorization_endpoint,
+      endSessionEndpoint: data.endpoints.end_session_endpoint ?? undefined,
+    },
   };
 }

@@ -2,6 +2,7 @@ import type { Env, AuthResult, SessionData, NormalizedIdentity } from '../types'
 import { isSessionData } from '../types';
 import type { SessionStore } from './session';
 import { isTokenExpiringSoon, refreshUserToken } from './refresh';
+import { decodeJwtPayload } from './jwt';
 
 export async function authresult(request: Request, env: Env, sessionStore: SessionStore): Promise<AuthResult> {
   const bearerToken = extractBearerToken(request);
@@ -29,7 +30,7 @@ export async function authresult(request: Request, env: Env, sessionStore: Sessi
       }
 
       if (validateSessionData(sessionData)) {
-        const identity = extractAuth0IdentityFromToken(sessionData.id_token ?? sessionData.access_token);
+        const identity = extractIdentityFromSession(sessionData);
         return {
           type: 'user',
           data: sessionData,
@@ -44,6 +45,11 @@ export async function authresult(request: Request, env: Env, sessionStore: Sessi
   return { type: 'user', data: '', token: '', authMethod: 'public' };
 }
 
+// Deliberately still scoped to the platform's one original Auth0 tenant
+// only — the Bearer-token auth path, not the cookie-session path. No
+// current caller presents a bearer token from an org-specific issuer; if
+// that ever changes, this needs the same per-issuer resolution the
+// session/device/login paths already have.
 async function validateAuth0Bearer(token: string, env: Env): Promise<NormalizedIdentity | null> {
   try {
     const response = await fetch(`https://${env.AUTH0_DOMAIN}/userinfo`, {
@@ -60,37 +66,37 @@ async function validateAuth0Bearer(token: string, env: Env): Promise<NormalizedI
       lastName: (userInfo.family_name as string) ?? '',
       username: (userInfo.nickname as string) ?? (userInfo.email as string) ?? '',
       roles: [],
-      provider: 'auth0',
+      issuer: `https://${env.AUTH0_DOMAIN}/`,
     };
   } catch {
     return null;
   }
 }
 
-// `roles` is always empty here: we never request an Auth0-API-scoped access token
-// (no `audience` param on login), so there is no `permissions` claim to read. Authorization
-// (what a logged-in user is allowed to do) is handled by the app itself, not by Auth0.
-function extractAuth0IdentityFromToken(token: string): NormalizedIdentity | undefined {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return undefined;
+// `roles` is always empty here: we never request an API-scoped access token
+// (no `audience` param on login), so there is no `permissions` claim to read.
+// Authorization (what a logged-in user is allowed to do) is handled by the
+// app itself, not by the identity provider.
+//
+// `issuer` comes from the session itself (recorded once at /callback or
+// /device/poll time, from whichever identity provider was actually
+// resolved for that login) — never re-derived from the token's own `iss`
+// claim, so a resolution bug can't quietly mislabel identity.
+function extractIdentityFromSession(sessionData: SessionData): NormalizedIdentity | undefined {
+  const token = sessionData.id_token ?? sessionData.access_token;
+  const payload = decodeJwtPayload(token);
+  if (!payload) return undefined;
 
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(base64)) as Record<string, unknown>;
-
-    return {
-      sub: (payload.sub as string) ?? '',
-      email: (payload.email as string) ?? '',
-      name: (payload.name as string) ?? '',
-      firstName: (payload.given_name as string) ?? '',
-      lastName: (payload.family_name as string) ?? '',
-      username: (payload.nickname as string) ?? (payload.email as string) ?? '',
-      roles: [],
-      provider: 'auth0',
-    };
-  } catch {
-    return undefined;
-  }
+  return {
+    sub: (payload.sub as string) ?? '',
+    email: (payload.email as string) ?? sessionData.email,
+    name: (payload.name as string) ?? sessionData.name,
+    firstName: (payload.given_name as string) ?? '',
+    lastName: (payload.family_name as string) ?? '',
+    username: (payload.nickname as string) ?? (payload.email as string) ?? sessionData.email,
+    roles: [],
+    issuer: sessionData.issuer,
+  };
 }
 
 function extractSessionId(request: Request): string | null {

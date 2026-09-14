@@ -1,21 +1,38 @@
-import type { Env, SessionData } from '../types';
-import { getOAuthEndpoints } from '../types';
+import type { Env, SessionData, PkceSessionData, OAuthSettings } from '../types';
+import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
 import { OAuthHandler } from './auth';
 import { buildSessionCookie } from './cookie';
 
-export class AuthRoutesHandler {
-  private oauth: OAuthHandler;
+const DEFAULT_ORG_ID = 'default';
 
-  constructor(private sessionStore: SessionStore, private env: Env) {
-    this.oauth = new OAuthHandler(this.sessionStore, {
-      OAUTH_CLIENT_ID: env.OAUTH_CLIENT_ID,
-      OAUTH_CLIENT_SECRET: env.OAUTH_CLIENT_SECRET,
-      FRONTEND_URL: env.FRONTEND_URL,
-      REDIRECT_URI: `${env.FRONTEND_URL}/callback`,
-      OAUTH_CONNECTION: env.OAUTH_CONNECTION,
-      endpoints: getOAuthEndpoints(env),
-    });
+export class AuthRoutesHandler {
+  constructor(private sessionStore: SessionStore, private env: Env) {}
+
+  // Builds an OAuthHandler for a specific org's resolved identity provider
+  // — replaces what used to be a single handler built once from this
+  // Worker's own hardcoded Auth0 vars.
+  private async buildOAuthHandler(orgId: string): Promise<OAuthHandler> {
+    const idp = await resolveIdpSettings(orgId, this.env);
+    const settings: OAuthSettings = {
+      OAUTH_CLIENT_ID: idp.clientId,
+      OAUTH_CLIENT_SECRET: idp.clientSecret,
+      FRONTEND_URL: this.env.FRONTEND_URL,
+      REDIRECT_URI: `${this.env.FRONTEND_URL}/callback`,
+      OAUTH_CONNECTION: idp.connectionName,
+      issuerUrl: idp.issuerUrl,
+      endpoints: idp.endpoints,
+    };
+    return new OAuthHandler(this.sessionStore, settings);
+  }
+
+  // /callback doesn't know which org a given login attempt was for except
+  // by reading it back out of the PKCE session `state` refers to — so peek
+  // at it here, before building the handler that will redo that same
+  // lookup (and delete it) inside oauth.callback().
+  private async peekPkceOrgId(state: string): Promise<string> {
+    const data = (await this.sessionStore.get(state)) as PkceSessionData | null;
+    return data?.orgId || DEFAULT_ORG_ID;
   }
 
   async processAuthRoute(request: Request): Promise<Response> {
@@ -30,7 +47,8 @@ export class AuthRoutesHandler {
         });
       }
 
-      const [authUrl, state] = await this.oauth.login();
+      const oauth = await this.buildOAuthHandler(DEFAULT_ORG_ID);
+      const [authUrl, state] = await oauth.login(DEFAULT_ORG_ID);
       return new Response(null, {
         status: 302,
         headers: {
@@ -42,7 +60,9 @@ export class AuthRoutesHandler {
 
     if (path === '/callback') {
       const params = Object.fromEntries(url.searchParams.entries());
-      const [userSessionData, error] = await this.oauth.callback(params.code ?? '', params.state ?? '');
+      const orgId = await this.peekPkceOrgId(params.state ?? '');
+      const oauth = await this.buildOAuthHandler(orgId);
+      const [userSessionData, error] = await oauth.callback(params.code ?? '', params.state ?? '');
 
       if (error || !userSessionData) {
         return new Response(JSON.stringify({ error: error ?? 'Unknown error' }), {
@@ -61,24 +81,42 @@ export class AuthRoutesHandler {
 
     if (path === '/logout') {
       const sessionId = extractSessionId(request);
+      const sessionData = sessionId ? ((await this.sessionStore.get(sessionId)) as SessionData | null) : null;
       if (sessionId) {
         await this.sessionStore.delete(sessionId);
       }
 
-      // Clearing our own session isn't enough — Auth0 keeps its own SSO session
-      // cookie, so without this the next /login would silently re-authenticate
-      // via that session instead of prompting again.
-      const auth0LogoutUrl = new URL(`https://${this.env.AUTH0_DOMAIN}/v2/logout`);
-      auth0LogoutUrl.searchParams.set('client_id', this.env.OAUTH_CLIENT_ID);
-      auth0LogoutUrl.searchParams.set('returnTo', this.env.FRONTEND_URL);
+      const clearCookieHeaders = { 'Set-Cookie': 'session_id=; Path=/; HttpOnly; Max-Age=0' };
 
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: auth0LogoutUrl.toString(),
-          'Set-Cookie': 'session_id=; Path=/; HttpOnly; Max-Age=0',
-        },
-      });
+      // Clearing our own session isn't enough — the identity provider may
+      // keep its own SSO session cookie, so without an upstream logout call
+      // too, the next /login would silently re-authenticate via that
+      // session instead of prompting again. Only possible if the provider
+      // exposes end_session_endpoint (OIDC RP-Initiated Logout) — not every
+      // provider does, so falling back to just clearing our own cookie is
+      // the correct behavior, not a degraded one.
+      if (sessionData?.orgId) {
+        try {
+          const idp = await resolveIdpSettings(sessionData.orgId, this.env);
+          if (idp.endpoints.endSessionEndpoint) {
+            const logoutUrl = new URL(idp.endpoints.endSessionEndpoint);
+            logoutUrl.searchParams.set('client_id', idp.clientId);
+            // Both param names set: OIDC's RP-Initiated Logout spec calls it
+            // post_logout_redirect_uri; Auth0's legacy /v2/logout (not used
+            // here, but some providers may still expect it) calls it
+            // returnTo. Unrecognized params are ignored, so this is safe
+            // across providers rather than something to branch on.
+            logoutUrl.searchParams.set('post_logout_redirect_uri', this.env.FRONTEND_URL);
+            logoutUrl.searchParams.set('returnTo', this.env.FRONTEND_URL);
+            if (sessionData.id_token) logoutUrl.searchParams.set('id_token_hint', sessionData.id_token);
+            return new Response(null, { status: 302, headers: { Location: logoutUrl.toString(), ...clearCookieHeaders } });
+          }
+        } catch (err) {
+          console.error('Kon identity provider niet ophalen voor logout, val terug op lokaal uitloggen', err);
+        }
+      }
+
+      return new Response(null, { status: 302, headers: { Location: this.env.FRONTEND_URL, ...clearCookieHeaders } });
     }
 
     return new Response(JSON.stringify({ error: 'Not found' }), {

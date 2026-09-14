@@ -5,6 +5,7 @@ export interface DeviceFlowSettings {
   clientId: string;
   clientSecret: string;
   endpoints: OAuthEndpoints;
+  issuerUrl: string;
 }
 
 export interface DeviceStartResult {
@@ -26,6 +27,7 @@ export class DeviceFlowHandler {
   private deviceCodeEndpoint: string;
   private tokenEndpoint: string;
   private userinfoEndpoint: string;
+  private issuerUrl: string;
 
   constructor(private sessionStore: SessionStore, settings: DeviceFlowSettings) {
     this.clientId = settings.clientId;
@@ -33,9 +35,10 @@ export class DeviceFlowHandler {
     this.deviceCodeEndpoint = settings.endpoints.deviceCodeEndpoint;
     this.tokenEndpoint = settings.endpoints.tokenEndpoint;
     this.userinfoEndpoint = settings.endpoints.userinfoEndpoint;
+    this.issuerUrl = settings.issuerUrl;
   }
 
-  async start(): Promise<DeviceStartResult | { error: string }> {
+  async start(orgId: string): Promise<DeviceStartResult | { error: string }> {
     // Note: unlike /authorize, Auth0's /oauth/device/code endpoint does not support a
     // `connection` param (only client_id, scope, audience are documented) — passing one
     // here caused login failures once a fresh authentication was actually required.
@@ -67,7 +70,7 @@ export class DeviceFlowHandler {
     };
 
     const pollId = await this.sessionStore.create(
-      { deviceCode: data.device_code, type: 'device_poll' } satisfies DevicePollSessionData,
+      { deviceCode: data.device_code, type: 'device_poll', orgId } satisfies DevicePollSessionData,
       data.expires_in
     );
 
@@ -135,6 +138,8 @@ export class DeviceFlowHandler {
       email: userInfo.email ?? '',
       name: userInfo.name ?? '',
       expires_at: Date.now() / 1000 + token.expires_in,
+      orgId: stored.orgId,
+      issuer: this.issuerUrl,
     };
 
     return [{ status: 'complete' }, sessionData];

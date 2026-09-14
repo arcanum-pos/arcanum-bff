@@ -1,5 +1,5 @@
 import type { SessionData, Env } from '../types';
-import { getOAuthEndpoints } from '../types';
+import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
 
 // Takes SessionData's own `expires_at` (set from the token response's `expires_in`
@@ -25,17 +25,20 @@ export async function refreshUserToken(
     return false;
   }
 
-  const { tokenEndpoint } = getOAuthEndpoints(env);
+  // Refresh must hit the same org's own token endpoint + client credentials
+  // it originally logged in against — not the platform default's, once
+  // per-org identity providers exist.
+  const idp = await resolveIdpSettings(sessionData.orgId, env);
 
   try {
-    const response = await fetch(tokenEndpoint, {
+    const response = await fetch(idp.endpoints.tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
-        client_id: env.OAUTH_CLIENT_ID,
-        client_secret: env.OAUTH_CLIENT_SECRET,
+        client_id: idp.clientId,
+        client_secret: idp.clientSecret,
       }),
     });
 
