@@ -70,6 +70,15 @@ export const DEVICE_PAGE_HTML = `<!doctype html>
     const statusEl = document.getElementById('status');
     const retryBtn = document.getElementById('retry-btn');
 
+    // This page is served at either /device (platform default) or
+    // /<orgId>/device (that org's own identity provider) — derive the
+    // matching /device/start URL from wherever this page itself was
+    // loaded from, so an org-scoped page actually starts an org-scoped
+    // login rather than always falling back to the default. /device/poll
+    // deliberately stays a single global path: the org is carried in the
+    // pollId's own stored session server-side, so it needs no prefix.
+    const deviceStartUrl = window.location.pathname.replace(/\\/device$/, '') + '/device/start';
+
     let pollTimer = null;
 
     function setStatus(text, className) {
@@ -118,7 +127,7 @@ export const DEVICE_PAGE_HTML = `<!doctype html>
       setStatus('Code aanmaken...');
 
       try {
-        const res = await fetch('/device/start', { method: 'POST' });
+        const res = await fetch(deviceStartUrl, { method: 'POST' });
         const data = await res.json();
 
         if (!res.ok || data.error) {

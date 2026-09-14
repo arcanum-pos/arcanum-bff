@@ -39,7 +39,10 @@ export class AuthRoutesHandler {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    if (path === '/login') {
+    // Matches both /login (group 1 undefined -> DEFAULT_ORG_ID) and
+    // /:orgId/login.
+    const loginMatch = path.match(/^\/(?:([^/]+)\/)?login$/);
+    if (loginMatch) {
       if (!(await this.checkRateLimit(request))) {
         return new Response('Te veel aanmeldpogingen. Probeer over een minuut opnieuw.', {
           status: 429,
@@ -47,8 +50,9 @@ export class AuthRoutesHandler {
         });
       }
 
-      const oauth = await this.buildOAuthHandler(DEFAULT_ORG_ID);
-      const [authUrl, state] = await oauth.login(DEFAULT_ORG_ID);
+      const orgId = loginMatch[1] || DEFAULT_ORG_ID;
+      const oauth = await this.buildOAuthHandler(orgId);
+      const [authUrl, state] = await oauth.login(orgId);
       return new Response(null, {
         status: 302,
         headers: {

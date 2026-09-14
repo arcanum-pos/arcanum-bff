@@ -1,5 +1,6 @@
 import type { OAuthEndpoints, SessionData, DevicePollSessionData } from '../types';
 import type { SessionStore } from './session';
+import { decodeJwtPayload } from './jwt';
 
 export interface DeviceFlowSettings {
   clientId: string;
@@ -118,6 +119,19 @@ export class DeviceFlowHandler {
       refresh_token?: string;
       expires_in: number;
     };
+
+    // Confirms the token actually came from the issuer resolved for this
+    // org, before trusting anything else in it — guards against a
+    // resolution bug or race silently minting a session against the wrong
+    // identity provider.
+    if (token.id_token) {
+      const payload = decodeJwtPayload(token.id_token);
+      if (!payload || payload.iss !== this.issuerUrl) {
+        console.error(`Issuer mismatch: expected ${this.issuerUrl}, got ${payload?.iss}`);
+        await this.sessionStore.delete(pollId);
+        return [{ status: 'error', message: 'Issuer mismatch' }, null];
+      }
+    }
 
     const userResponse = await fetch(this.userinfoEndpoint, {
       headers: { Authorization: `Bearer ${token.access_token}` },

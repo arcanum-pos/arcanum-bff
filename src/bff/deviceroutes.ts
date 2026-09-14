@@ -41,7 +41,12 @@ export class DeviceRoutesHandler {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    if (path === '/device' && request.method === 'GET') {
+    // Matches both /device (group 1 undefined -> DEFAULT_ORG_ID) and
+    // /:orgId/device — same static page either way; its own script computes
+    // the matching /device/start URL from window.location (see
+    // devicePage.ts).
+    const deviceMatch = path.match(/^\/(?:([^/]+)\/)?device$/);
+    if (deviceMatch && request.method === 'GET') {
       return new Response(DEVICE_PAGE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
 
@@ -51,9 +56,12 @@ export class DeviceRoutesHandler {
       });
     }
 
-    if (path === '/device/start' && request.method === 'POST') {
-      const device = await this.buildDeviceHandler(DEFAULT_ORG_ID);
-      const result = await device.start(DEFAULT_ORG_ID);
+    // Matches both /device/start and /:orgId/device/start.
+    const startMatch = path.match(/^\/(?:([^/]+)\/)?device\/start$/);
+    if (startMatch && request.method === 'POST') {
+      const orgId = startMatch[1] || DEFAULT_ORG_ID;
+      const device = await this.buildDeviceHandler(orgId);
+      const result = await device.start(orgId);
       if ('error' in result) return json(result, 502);
       return json(result);
     }

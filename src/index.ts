@@ -41,7 +41,15 @@ export default {
 
     const sessionStore = new CloudflareKVSessionStore(env.QUESTO_SESSIONS);
 
-    if (path === '/login' || path === '/callback' || path === '/logout') {
+    // /login and /device (+ /device/start) also have an org-scoped variant,
+    // /:orgId/login and /:orgId/device(/start) — the only entry points that
+    // need to know the org up front. /callback and /device/poll deliberately
+    // stay these exact global paths regardless: the org travels inside the
+    // short-lived PKCE/device-poll session created at start time, so
+    // resolving it again there needs no URL prefix (also means an org's own
+    // identity provider only ever needs the one, unprefixed redirect_uri
+    // registered — same as every org today).
+    if (path === '/login' || path === '/callback' || path === '/logout' || /^\/[^/]+\/login$/.test(path)) {
       const authHandler = new AuthRoutesHandler(sessionStore, env);
       return authHandler.processAuthRoute(request);
     }
@@ -49,7 +57,12 @@ export default {
     // Device Authorization Grant: a kiosk device shows a QR/code, the user completes
     // login on their own phone, the kiosk polls until done. Public — no session/cookie
     // needed to start or poll, since the whole point is authenticating this device.
-    if (path === '/device' || path.startsWith('/device/')) {
+    if (
+      path === '/device' ||
+      path.startsWith('/device/') ||
+      /^\/[^/]+\/device$/.test(path) ||
+      /^\/[^/]+\/device\/start$/.test(path)
+    ) {
       const deviceHandler = new DeviceRoutesHandler(sessionStore, env);
       return deviceHandler.processDeviceRoute(request);
     }
