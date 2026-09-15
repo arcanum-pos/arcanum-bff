@@ -3,14 +3,14 @@
 check deployment with commit
 
 Backend-for-frontend for the Elewijtse Pijl app. Single front door on
-`elewijtsepijl.esvvzw.be`: handles login against Auth0 (Google Workspace
+`questo.kaboutersoft.be`: handles login against Auth0 (Google Workspace
 connection), then proxies everything else — the static webapp UI and the
 bancontact worker's API — to two other Workers via service bindings, so
 neither of those Workers needs to be publicly reachable anymore.
 
 ```
 Browser
-  └─ elewijtsepijl.esvvzw.be/*  → questo-bff
+  └─ questo.kaboutersoft.be/*  → questo-bff
        ├─ /login /callback /logout      → Auth0
        ├─ /whoami                       → current session identity
        ├─ /api/bancontact/*  (auth'd)   → service binding → questo-bancontact-worker
@@ -37,9 +37,9 @@ In your new Auth0 tenant (the one already wired to Google Workspace):
 
 1. Create an Application → type **Regular Web Application**.
 2. Enable the Google Workspace connection on it.
-3. Allowed Callback URLs: `https://elewijtsepijl.esvvzw.be/callback`
+3. Allowed Callback URLs: `https://questo.kaboutersoft.be/callback`
    (add `http://localhost:8787/callback` too if you'll test locally).
-4. Allowed Logout URLs: `https://elewijtsepijl.esvvzw.be`
+4. Allowed Logout URLs: `https://questo.kaboutersoft.be`
 5. Copy the Client ID and Client Secret — you'll need them below.
 6. Do **not** create an Auth0 API for this. Authorization stays in the app.
 
@@ -87,7 +87,7 @@ deploy time). Deploy order:
    in questo's `webapp/wrangler.jsonc` — the custom domain moves here).
 2. Deploy `questo-bancontact-worker` (unchanged).
 3. Deploy this Worker (`wrangler deploy`), which claims
-   `elewijtsepijl.esvvzw.be`.
+   `questo.kaboutersoft.be`.
 
 A custom domain can only be attached to one Worker at a time — if
 `questo-webapp` still has the route when you try to attach it here, the
@@ -114,7 +114,7 @@ mode this Worker talks to them over plain HTTP instead of service bindings.
 
 ## Smoke test after deploying
 
-1. Visit `https://elewijtsepijl.esvvzw.be/` → redirected to `/login` →
+1. Visit `https://questo.kaboutersoft.be/` → redirected to `/login` →
    Google Workspace login → redirected back, session cookie set, entry
    screen loads.
 2. `GET /whoami` → your identity (sub/email/name), `roles: []`.

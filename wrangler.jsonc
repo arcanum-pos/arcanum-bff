@@ -56,7 +56,7 @@
 		// Replace with your new Auth0 tenant's domain, e.g. "your-tenant.eu.auth0.com".
 		"AUTH0_DOMAIN": "auth.esvvzw.be",
 		"SESSION_TTL": 604800,
-		"FRONTEND_URL": "https://elewijtsepijl.esvvzw.be",
+		"FRONTEND_URL": "https://questo.kaboutersoft.be",
 		// Forces login straight to this Auth0 connection, skipping Auth0's own
 		// connection picker. Must also be disabled/removed from the "Social" side
 		// (Applications > this app > Connections tab) if you want to guarantee no
@@ -70,7 +70,7 @@
 	},
 	"routes": [
 		{
-			"pattern": "elewijtsepijl.esvvzw.be",
+			"pattern": "questo.kaboutersoft.be",
 			"custom_domain": true
 		}
 	]
