@@ -26,6 +26,15 @@
 		{
 			"binding": "DEVICEHUB_SERVICE",
 			"service": "questo-devicehub"
+		},
+		{
+			// The new admin portal — served at /console alongside questo-webapp's
+			// existing /admin.html and /admin-org.html while the port is in
+			// progress. Update the "service" name below if the deployed Worker
+			// ends up with a different name than questo-admin's own
+			// wrangler.jsonc currently declares.
+			"binding": "CONSOLE_SERVICE",
+			"service": "questo-admin"
 		}
 	],
 	"ratelimits": [

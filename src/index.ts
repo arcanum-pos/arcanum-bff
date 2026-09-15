@@ -98,7 +98,29 @@ export default {
       // costs a KV write.
       return new Response(LOGIN_PROMPT_HTML, { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
-    const uiProxy = new UIFrontendProxy(env);
+
+    // The new admin portal (questo-admin) lives at /console, alongside the
+    // existing /admin.html and /admin-org.html (questo-webapp) while the
+    // port is in progress — same auth gate as any other UI path above,
+    // just a different backend. /assets/* is questo-admin's own Vite
+    // build's asset prefix (distinct from questo-webapp's Astro output,
+    // which uses /_astro/*), so it's routed here regardless of which page
+    // loaded it — every entry questo-admin ever adds shares this one
+    // dist/assets/ folder.
+    if (path === '/console' || path.startsWith('/console/') || path.startsWith('/assets/')) {
+      const consoleProxy = new UIFrontendProxy(env, {
+        service: env.CONSOLE_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/admin.html',
+      });
+      return consoleProxy.handleRequest(request, path);
+    }
+
+    const uiProxy = new UIFrontendProxy(env, {
+      service: env.WEBAPP_SERVICE,
+      localUrl: env.UIPROXY_URL,
+      fallbackFile: '/index.html',
+    });
     return uiProxy.handleRequest(request, path);
   },
 };

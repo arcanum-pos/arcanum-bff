@@ -5,10 +5,21 @@ const STATIC_EXTENSIONS = [
   '.ico', '.webp', '.woff', '.woff2', '.ttf', '.eot',
 ];
 
+export interface UIProxyTarget {
+  service?: Fetcher;
+  localUrl?: string;
+  // Served (as a 200) for any request this backend 404s on and that isn't
+  // itself a static asset — the client-side-routing fallback. questo-webapp
+  // (Astro, one real HTML file per page) uses /index.html; questo-admin
+  // (Vite, one real HTML file per *app*) uses /admin.html for anything
+  // under /console, since it has no /index.html at all.
+  fallbackFile: string;
+}
+
 export class UIFrontendProxy {
   private isDevelopment: boolean;
 
-  constructor(private env: Env) {
+  constructor(env: Env, private target: UIProxyTarget) {
     this.isDevelopment =
       env.FRONTEND_URL?.includes('localhost') || env.FRONTEND_URL?.includes('127.0.0.1');
   }
@@ -29,9 +40,9 @@ export class UIFrontendProxy {
   }
 
   private async proxyViaHttp(request: Request, path: string): Promise<Response> {
-    const uiBaseUrl = this.env.UIPROXY_URL;
+    const uiBaseUrl = this.target.localUrl;
     if (!uiBaseUrl) {
-      console.error('UIPROXY_URL not configured for development mode');
+      console.error('No local URL configured for development mode');
       return new Response('UI configuration error', { status: 500 });
     }
 
@@ -47,9 +58,9 @@ export class UIFrontendProxy {
     } as RequestInit);
 
     if (response.status === 404 && !this.isStaticAsset(path)) {
-      const indexResponse = await fetch(`${uiBaseUrl}/index.html`, { headers });
-      if (indexResponse.ok) {
-        return new Response(await indexResponse.text(), {
+      const fallbackResponse = await fetch(`${uiBaseUrl}${this.target.fallbackFile}`, { headers });
+      if (fallbackResponse.ok) {
+        return new Response(await fallbackResponse.text(), {
           status: 200,
           headers: {
             'Content-Type': 'text/html; charset=utf-8',
@@ -63,9 +74,9 @@ export class UIFrontendProxy {
   }
 
   private async proxyViaServiceBinding(request: Request, path: string): Promise<Response> {
-    const uiWorker = this.env.WEBAPP_SERVICE;
+    const uiWorker = this.target.service;
     if (!uiWorker) {
-      console.error('Service binding WEBAPP_SERVICE not found');
+      console.error('No service binding configured for this UI target');
       return new Response('UI service configuration error', { status: 500 });
     }
 
@@ -76,11 +87,11 @@ export class UIFrontendProxy {
     });
 
     if (response.status === 404 && !this.isStaticAsset(path)) {
-      const indexResponse = await uiWorker.fetch('http://pages-worker/index.html', {
+      const fallbackResponse = await uiWorker.fetch(`http://pages-worker${this.target.fallbackFile}`, {
         headers: request.headers,
       });
-      if (indexResponse.ok) {
-        response = new Response(await indexResponse.text(), {
+      if (fallbackResponse.ok) {
+        response = new Response(await fallbackResponse.text(), {
           status: 200,
           headers: {
             'Content-Type': 'text/html; charset=utf-8',

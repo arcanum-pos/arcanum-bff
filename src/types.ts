@@ -25,6 +25,11 @@ export interface Env {
   WEBAPP_SERVICE: Fetcher;
   BANCONTACT_SERVICE: Fetcher;
   DEVICEHUB_SERVICE: Fetcher;
+  // The new admin portal (questo-admin, Vite/React/shadcn) — reached at
+  // /console, running alongside WEBAPP_SERVICE's existing /admin.html and
+  // /admin-org.html while the port is in progress. Optional: unset in an
+  // environment that hasn't deployed it yet.
+  CONSOLE_SERVICE?: Fetcher;
   // Still used by authresult.ts's Bearer-token auth path (validateAuth0Bearer)
   // — deliberately scoped to the platform's one original tenant only, not
   // yet multi-issuer-aware. Everything else (login, device, refresh,
@@ -50,6 +55,7 @@ export interface Env {
   UIPROXY_URL?: string;
   BANCONTACT_LOCAL_URL?: string;
   DEVICEHUB_LOCAL_URL?: string;
+  CONSOLE_LOCAL_URL?: string;
   // Optional cookie domain, e.g. ".example.com", only needed if the BFF and another
   // subdomain need to share a session cookie
   COOKIE_DOMAIN?: string;

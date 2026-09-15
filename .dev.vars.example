@@ -17,3 +17,10 @@ BANCONTACT_LOCAL_URL=http://localhost:8789
 
 # Local `wrangler dev` URL for the questo-devicehub Worker (run it on a different port).
 DEVICEHUB_LOCAL_URL=http://localhost:8790
+
+# Local `wrangler dev` URL for the questo-admin Worker (run it on a different port).
+CONSOLE_LOCAL_URL=http://localhost:8791
+
+# Authorizes calls to worker's internal-only identity-provider-resolution
+# route — must match worker's own BFF_INTERNAL_KEY.
+BFF_INTERNAL_KEY=change-me-to-a-long-random-value
