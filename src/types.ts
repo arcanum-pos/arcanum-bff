@@ -36,11 +36,6 @@ export interface Env {
   // logout) now resolves via resolveIdpSettings instead.
   AUTH0_DOMAIN: string;
   SESSION_TTL: number;
-  // No longer read anywhere as of the multi-issuer identity-provider work
-  // (resolveIdpSettings replaces all of it) — left declared/deployed until
-  // they're formally deleted, so removal is its own deliberate step rather
-  // than an accidental side effect of this change.
-  OAUTH_CONNECTION?: string;
   OAUTH_CLIENT_ID: string;
   OAUTH_CLIENT_SECRET: string;
   FRONTEND_URL: string;

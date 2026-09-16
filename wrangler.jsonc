@@ -56,14 +56,7 @@
 		// Replace with your new Auth0 tenant's domain, e.g. "your-tenant.eu.auth0.com".
 		"AUTH0_DOMAIN": "auth.esvvzw.be",
 		"SESSION_TTL": 604800,
-		"FRONTEND_URL": "https://questo.kaboutersoft.be",
-		// Forces login straight to this Auth0 connection, skipping Auth0's own
-		// connection picker. Must also be disabled/removed from the "Social" side
-		// (Applications > this app > Connections tab) if you want to guarantee no
-		// one can bypass this by crafting their own /authorize URL with a
-		// different connection param — this var alone only changes what the
-		// BFF's own login link does, not what Auth0 accepts for this client_id.
-		"OAUTH_CONNECTION": "googleworkspace"
+		"FRONTEND_URL": "https://questo.kaboutersoft.be"
 		// No AUDIENCE var: we deliberately don't request an Auth0-API-scoped access token.
 		// Authorization (who can do what) is handled inside the app, not via Auth0 permissions/scopes.
 		// COOKIE_DOMAIN and ALLOWED_ORIGINS are not needed: UI and API are same-origin behind this BFF.
