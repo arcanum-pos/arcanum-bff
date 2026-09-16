@@ -56,14 +56,14 @@
 		// Replace with your new Auth0 tenant's domain, e.g. "your-tenant.eu.auth0.com".
 		"AUTH0_DOMAIN": "auth.esvvzw.be",
 		"SESSION_TTL": 604800,
-		"FRONTEND_URL": "https://questo.kaboutersoft.be"
+		"FRONTEND_URL": "https://arcanum.kaboutersoft.be"
 		// No AUDIENCE var: we deliberately don't request an Auth0-API-scoped access token.
 		// Authorization (who can do what) is handled inside the app, not via Auth0 permissions/scopes.
 		// COOKIE_DOMAIN and ALLOWED_ORIGINS are not needed: UI and API are same-origin behind this BFF.
 	},
 	"routes": [
 		{
-			"pattern": "questo.kaboutersoft.be",
+			"pattern": "arcanum.kaboutersoft.be",
 			"custom_domain": true
 		}
 	]
