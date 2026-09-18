@@ -40,7 +40,14 @@ export class ServiceProxy {
     return this.authResult.token || null;
   }
 
+  // `headers` starts as a copy of the client's own request headers, so a
+  // client could set X-User-Sub/X-User-Issuer itself to impersonate another
+  // org's member — always clear them first so a falsy `identity` can't leave
+  // a client-forged value in place unrewritten.
   private setIdentityHeaders(headers: Headers): void {
+    for (const h of ['X-User-Email', 'X-User-Sub', 'X-User-Issuer', 'X-User-Name', 'X-User-Roles']) {
+      headers.delete(h);
+    }
     const { identity } = this.authResult;
     if (!identity) return;
     if (identity.email) headers.set('X-User-Email', identity.email);
