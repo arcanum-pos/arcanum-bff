@@ -32,7 +32,7 @@
 			// alongside questo-webapp's existing /admin.html and /admin-org.html
 			// while the port is in progress.
 			"binding": "CONSOLE_SERVICE",
-			"service": "questo-console"
+			"service": "questo-frontends"
 		}
 	],
 	"ratelimits": [
