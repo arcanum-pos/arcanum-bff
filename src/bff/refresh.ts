@@ -27,8 +27,11 @@ export async function refreshUserToken(
 
   // Refresh must hit the same org's own token endpoint + client credentials
   // it originally logged in against — not the platform default's, once
-  // per-org identity providers exist.
-  const idp = await resolveIdpSettings(sessionData.orgId, env);
+  // per-org identity providers exist. `?? 'authcode'` covers a session
+  // created before authPurpose existed: at the time, every flow used the
+  // one primary client, exactly what 'authcode' still resolves to for an
+  // org with no auth_code_client_id override configured.
+  const idp = await resolveIdpSettings(sessionData.orgId, env, sessionData.authPurpose ?? 'authcode');
 
   try {
     const response = await fetch(idp.endpoints.tokenEndpoint, {

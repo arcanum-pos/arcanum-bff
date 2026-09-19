@@ -11,9 +11,11 @@ export class AuthRoutesHandler {
 
   // Builds an OAuthHandler for a specific org's resolved identity provider
   // — replaces what used to be a single handler built once from this
-  // Worker's own hardcoded Auth0 vars.
+  // Worker's own hardcoded Auth0 vars. Always the authorization-code client
+  // — this class only ever drives that flow (device.ts is the device-grant
+  // counterpart).
   private async buildOAuthHandler(orgId: string): Promise<OAuthHandler> {
-    const idp = await resolveIdpSettings(orgId, this.env);
+    const idp = await resolveIdpSettings(orgId, this.env, 'authcode');
     const settings: OAuthSettings = {
       OAUTH_CLIENT_ID: idp.clientId,
       OAUTH_CLIENT_SECRET: idp.clientSecret,
@@ -44,24 +46,18 @@ export class AuthRoutesHandler {
     // /:orgId/login.
     const loginMatch = path.match(/^\/(?:([^/]+)\/)?login$/);
     if (loginMatch) {
-      if (!(await this.checkRateLimit(request))) {
-        return new Response('Te veel aanmeldpogingen. Probeer over een minuut opnieuw.', {
-          status: 429,
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-        });
-      }
-
       const orgId = loginMatch[1] || DEFAULT_ORG_ID;
       const returnTo = sanitizeReturnTo(url.searchParams.get('returnTo'));
-      const oauth = await this.buildOAuthHandler(orgId);
-      const [authUrl, state] = await oauth.login(orgId, returnTo);
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: authUrl,
-          'Set-Cookie': `oauth_state=${state}; Path=/; HttpOnly; Max-Age=600`,
-        },
-      });
+      return this.startLogin(orgId, returnTo, request);
+    }
+
+    // /:orgId/console: the authorization-code flow's counterpart to
+    // /:orgId/device — same login, always landing on /console. No
+    // unprefixed /console variant: that's the actual admin app itself
+    // (handled in index.ts, never reaching AuthRoutesHandler).
+    const consoleLoginMatch = path.match(/^\/([^/]+)\/console$/);
+    if (consoleLoginMatch) {
+      return this.startLogin(consoleLoginMatch[1], '/console', request);
     }
 
     if (path === '/callback') {
@@ -103,7 +99,7 @@ export class AuthRoutesHandler {
       // the correct behavior, not a degraded one.
       if (sessionData?.orgId) {
         try {
-          const idp = await resolveIdpSettings(sessionData.orgId, this.env);
+          const idp = await resolveIdpSettings(sessionData.orgId, this.env, sessionData.authPurpose ?? 'authcode');
           if (idp.endpoints.endSessionEndpoint) {
             const logoutUrl = new URL(idp.endpoints.endSessionEndpoint);
             logoutUrl.searchParams.set('client_id', idp.clientId);
@@ -128,6 +124,28 @@ export class AuthRoutesHandler {
     return new Response(JSON.stringify({ error: 'Not found' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Shared by /login, /:orgId/login, and /:orgId/console — all three start
+  // the exact same authorization-code flow, differing only in which org and
+  // where the browser lands afterward.
+  private async startLogin(orgId: string, returnTo: string, request: Request): Promise<Response> {
+    if (!(await this.checkRateLimit(request))) {
+      return new Response('Te veel aanmeldpogingen. Probeer over een minuut opnieuw.', {
+        status: 429,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    const oauth = await this.buildOAuthHandler(orgId);
+    const [authUrl, state] = await oauth.login(orgId, returnTo);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: authUrl,
+        'Set-Cookie': `oauth_state=${state}; Path=/; HttpOnly; Max-Age=600`,
+      },
     });
   }
 

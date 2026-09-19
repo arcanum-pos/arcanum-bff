@@ -174,6 +174,7 @@ export class DeviceFlowHandler {
       expires_at: Date.now() / 1000 + token.expires_in,
       orgId: stored.orgId,
       issuer: this.issuerUrl,
+      authPurpose: 'device',
     };
 
     return [{ status: 'complete' }, sessionData];

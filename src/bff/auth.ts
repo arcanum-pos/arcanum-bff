@@ -126,6 +126,7 @@ export class OAuthHandler {
         expires_at: Date.now() / 1000 + token.expires_in,
         orgId,
         issuer: this.issuerUrl,
+        authPurpose: 'authcode',
       };
 
       await this.sessionStore.delete(state);

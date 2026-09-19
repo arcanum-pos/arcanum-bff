@@ -77,6 +77,13 @@ export interface SessionData {
   // (refresh, logout) and to forward X-User-Issuer to worker.
   orgId: string;
   issuer: string;
+  // Which OAuth client actually issued this token — 'authcode' (/callback)
+  // or 'device' (/device/poll). A provider that requires a separate client
+  // per flow (see identity-providers.ts's auth_code_client_id override)
+  // will reject a refresh_token grant presented with the wrong client_id/
+  // secret, so refresh.ts must resolve the same purpose the session was
+  // actually created with, not always 'authcode'.
+  authPurpose: 'device' | 'authcode';
 }
 
 export interface PkceSessionData {
@@ -144,8 +151,13 @@ export interface IdpSettings {
   endpoints: OAuthEndpoints;
 }
 
-export async function resolveIdpSettings(orgId: string, env: Env): Promise<IdpSettings> {
-  const res = await callWorker(env, `/organizations/${encodeURIComponent(orgId)}/identity-provider/resolve`);
+// `purpose` picks which of an org's OAuth clients to use — 'authcode' for
+// the browser flow (/login, /:orgId/console), 'device' for the device grant
+// (/:orgId/device). Some providers (Google) require a separate client per
+// flow; worker resolves the actual override, this just says which one it
+// wants — see identity-providers.ts's resolveIdentityProviderForAuth.
+export async function resolveIdpSettings(orgId: string, env: Env, purpose: 'device' | 'authcode'): Promise<IdpSettings> {
+  const res = await callWorker(env, `/organizations/${encodeURIComponent(orgId)}/identity-provider/resolve?purpose=${purpose}`);
   if (!res.ok) {
     throw new Error(`Failed to resolve identity provider for org '${orgId}': ${res.status}`);
   }
