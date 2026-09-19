@@ -105,14 +105,13 @@ export default {
       return new Response(LOGIN_PROMPT_HTML, { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
 
-    // The new admin portal (questo-admin) lives at /console, alongside the
-    // existing /admin.html and /admin-org.html (questo-webapp) while the
-    // port is in progress — same auth gate as any other UI path above,
-    // just a different backend. /assets/* is questo-admin's own Vite
-    // build's asset prefix (distinct from questo-webapp's Astro output,
-    // which uses /_astro/*), so it's routed here regardless of which page
-    // loaded it — every entry questo-admin ever adds shares this one
-    // dist/assets/ folder.
+    // The admin portal (questo-admin) lives at /console — questo-webapp's
+    // old /admin.html and /admin-org.html pages it replaced are gone. Same
+    // auth gate as any other UI path above, just a different backend.
+    // /assets/* is questo-admin's own Vite build's asset prefix (distinct
+    // from questo-webapp's Astro output, which uses /_astro/*), so it's
+    // routed here regardless of which page loaded it — every entry
+    // questo-admin ever adds shares this one dist/assets/ folder.
     if (path === '/console' || path.startsWith('/console/') || path.startsWith('/assets/')) {
       const consoleProxy = new UIFrontendProxy(env, {
         service: env.CONSOLE_SERVICE,

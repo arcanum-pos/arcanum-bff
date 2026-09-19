@@ -25,10 +25,8 @@ export interface Env {
   WEBAPP_SERVICE: Fetcher;
   BANCONTACT_SERVICE: Fetcher;
   DEVICEHUB_SERVICE: Fetcher;
-  // The new admin portal (questo-admin, Vite/React/shadcn) — reached at
-  // /console, running alongside WEBAPP_SERVICE's existing /admin.html and
-  // /admin-org.html while the port is in progress. Optional: unset in an
-  // environment that hasn't deployed it yet.
+  // The admin portal (questo-admin, Vite/React/shadcn) — reached at /console.
+  // Optional: unset in an environment that hasn't deployed it yet.
   CONSOLE_SERVICE?: Fetcher;
   // Still used by authresult.ts's Bearer-token auth path (validateAuth0Bearer)
   // — deliberately scoped to the platform's one original tenant only, not

@@ -28,9 +28,9 @@
 			"service": "questo-devicehub"
 		},
 		{
-			// The new admin portal (repo: questo-console) — served at /console
-			// alongside questo-webapp's existing /admin.html and /admin-org.html
-			// while the port is in progress.
+			// The admin portal (repo: questo-console) — served at /console.
+			// questo-webapp's old /admin.html and /admin-org.html pages it
+			// replaced have been removed.
 			"binding": "CONSOLE_SERVICE",
 			"service": "questo-frontends"
 		}
