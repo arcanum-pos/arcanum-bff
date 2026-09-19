@@ -114,9 +114,16 @@ async function getSessionData(sessionStore: SessionStore, sessionId: string): Pr
   return isSessionData(data as SessionData) ? (data as SessionData) : null;
 }
 
+// email is NOT required here even though every other social connection
+// happens to provide one — GitHub only returns an email when the user has a
+// public/verified one and the connection requests the user:email scope,
+// so a real, successfully-authenticated GitHub login can legitimately have
+// no email at all (name can be blank too — GitHub only guarantees a
+// username). Actual identity is (issuer, sub), extracted separately in
+// extractIdentityFromSession; email/name are display-only from here on.
 function validateSessionData(data: SessionData | null): data is SessionData {
   if (!data) return false;
-  if (!data.access_token || !data.email) {
+  if (!data.access_token) {
     console.error('Session missing required fields');
     return false;
   }
