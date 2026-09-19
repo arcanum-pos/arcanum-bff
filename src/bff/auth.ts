@@ -29,12 +29,12 @@ export class OAuthHandler {
     this.scope = settings.scope ?? 'openid profile email offline_access';
   }
 
-  async login(orgId: string): Promise<[string, string]> {
+  async login(orgId: string, returnTo?: string): Promise<[string, string]> {
     const codeVerifier = this._generateCodeVerifier();
     const codeChallenge = await this._generateCodeChallenge(codeVerifier);
 
     const tempSessionId = await this.sessionStore.create(
-      { codeVerifier, type: 'oauth_pkce', orgId } satisfies PkceSessionData,
+      { codeVerifier, type: 'oauth_pkce', orgId, returnTo } satisfies PkceSessionData,
       600
     );
 

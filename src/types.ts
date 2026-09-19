@@ -83,6 +83,11 @@ export interface PkceSessionData {
   codeVerifier: string;
   type: 'oauth_pkce';
   orgId: string;
+  // Where to send the browser after a successful callback — defaults to
+  // FRONTEND_URL (the root chooser) when unset. Sanitized before being
+  // stored (see authroutes.ts's sanitizeReturnTo) so a crafted /login?
+  // returnTo= can't turn this into an open redirect.
+  returnTo?: string;
 }
 
 export interface DevicePollSessionData {

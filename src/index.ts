@@ -102,7 +102,7 @@ export default {
       // session on every hit. That silently burned through the Workers KV free-tier
       // daily write quota. Requiring an actual click means only a real login attempt
       // costs a KV write.
-      return new Response(LOGIN_PROMPT_HTML, { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return new Response(loginPromptHtml(path), { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
 
     // The admin portal (questo-admin) lives at /console — questo-webapp's
@@ -151,15 +151,22 @@ function corsResponse(response: Response, request: Request, env: Env): Response 
   return out;
 }
 
-const LOGIN_PROMPT_HTML = `<!DOCTYPE html>
+// Carries the originally-requested path through /login so /callback lands
+// the browser back where it was headed (e.g. /console) instead of always
+// the root chooser — see authroutes.ts's sanitizeReturnTo for why this is
+// safe to build straight from `path` (already a browser-parsed pathname).
+function loginPromptHtml(returnTo: string): string {
+  const href = returnTo && returnTo !== '/' ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login';
+  return `<!DOCTYPE html>
 <html lang="nl">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aanmelden vereist</title>
 <style>body{font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;background:#f5f5f5}
 a{display:inline-block;padding:.75rem 1.5rem;background:#1a73e8;color:#fff;text-decoration:none;border-radius:.5rem;font-weight:600}</style>
 </head>
-<body><a href="/login">Aanmelden om verder te gaan</a></body>
+<body><a href="${href}">Aanmelden om verder te gaan</a></body>
 </html>`;
+}
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {

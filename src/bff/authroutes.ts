@@ -27,13 +27,13 @@ export class AuthRoutesHandler {
     return new OAuthHandler(this.sessionStore, settings);
   }
 
-  // /callback doesn't know which org a given login attempt was for except
-  // by reading it back out of the PKCE session `state` refers to — so peek
-  // at it here, before building the handler that will redo that same
-  // lookup (and delete it) inside oauth.callback().
-  private async peekPkceOrgId(state: string): Promise<string> {
+  // /callback doesn't know which org (or intended destination) a given login
+  // attempt was for except by reading it back out of the PKCE session
+  // `state` refers to — so peek at it here, before building the handler
+  // that will redo that same lookup (and delete it) inside oauth.callback().
+  private async peekPkceSession(state: string): Promise<{ orgId: string; returnTo: string }> {
     const data = (await this.sessionStore.get(state)) as PkceSessionData | null;
-    return data?.orgId || DEFAULT_ORG_ID;
+    return { orgId: data?.orgId || DEFAULT_ORG_ID, returnTo: sanitizeReturnTo(data?.returnTo) };
   }
 
   async processAuthRoute(request: Request): Promise<Response> {
@@ -52,8 +52,9 @@ export class AuthRoutesHandler {
       }
 
       const orgId = loginMatch[1] || DEFAULT_ORG_ID;
+      const returnTo = sanitizeReturnTo(url.searchParams.get('returnTo'));
       const oauth = await this.buildOAuthHandler(orgId);
-      const [authUrl, state] = await oauth.login(orgId);
+      const [authUrl, state] = await oauth.login(orgId, returnTo);
       return new Response(null, {
         status: 302,
         headers: {
@@ -65,7 +66,7 @@ export class AuthRoutesHandler {
 
     if (path === '/callback') {
       const params = Object.fromEntries(url.searchParams.entries());
-      const orgId = await this.peekPkceOrgId(params.state ?? '');
+      const { orgId, returnTo } = await this.peekPkceSession(params.state ?? '');
       const oauth = await this.buildOAuthHandler(orgId);
       const [userSessionData, error] = await oauth.callback(params.code ?? '', params.state ?? '');
 
@@ -80,7 +81,7 @@ export class AuthRoutesHandler {
 
       return new Response(null, {
         status: 302,
-        headers: { Location: this.env.FRONTEND_URL, 'Set-Cookie': buildSessionCookie(this.env, newSessionId) },
+        headers: { Location: `${this.env.FRONTEND_URL}${returnTo}`, 'Set-Cookie': buildSessionCookie(this.env, newSessionId) },
       });
     }
 
@@ -145,4 +146,16 @@ function extractSessionId(request: Request): string | null {
     if (name === 'session_id') return value ?? null;
   }
   return null;
+}
+
+// /login?returnTo=... is a public, unauthenticated GET — this is the one
+// place standing between an arbitrary query value and a 302 Location header
+// built from it. Only an own-origin relative path is accepted (must start
+// with a single '/', never '//' or contain '://', both of which a browser
+// would treat as a different origin); anything else falls back to '' (the
+// existing default: FRONTEND_URL alone, i.e. the root chooser).
+function sanitizeReturnTo(value: string | null | undefined): string {
+  if (!value) return '';
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('://')) return '';
+  return value;
 }
