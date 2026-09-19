@@ -3,7 +3,7 @@ import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
 import { DeviceFlowHandler } from './device';
 import { buildSessionCookie } from './cookie';
-import { DEVICE_PAGE_HTML } from '../devicePage';
+import { renderDevicePage } from '../devicePage';
 import { QRCODE_BUNDLE_JS } from '../assets/qrcodeBundle';
 
 const DEFAULT_ORG_ID = 'default';
@@ -48,7 +48,19 @@ export class DeviceRoutesHandler {
     // devicePage.ts).
     const deviceMatch = path.match(/^\/(?:([^/]+)\/)?device$/);
     if (deviceMatch && request.method === 'GET') {
-      return new Response(DEVICE_PAGE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return new Response(renderDevicePage('/'), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    }
+
+    // /:orgId/console: the same device-grant QR/code page, repurposed for
+    // admin-portal login — for an org whose identity provider only supports
+    // the device grant (e.g. a Google "TV and Limited Input" client, which
+    // can't do the authorization-code flow at all), this is the only way to
+    // log an admin into /console at all. No unprefixed /console variant:
+    // the platform default org's identity provider already supports the
+    // regular browser flow, so it has no need for this workaround.
+    const consoleLoginMatch = path.match(/^\/([^/]+)\/console$/);
+    if (consoleLoginMatch && request.method === 'GET') {
+      return new Response(renderDevicePage('/console'), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     }
 
     if (path === '/device/qrcode.js' && request.method === 'GET') {

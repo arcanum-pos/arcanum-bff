@@ -57,11 +57,17 @@ export default {
     // Device Authorization Grant: a kiosk device shows a QR/code, the user completes
     // login on their own phone, the kiosk polls until done. Public — no session/cookie
     // needed to start or poll, since the whole point is authenticating this device.
+    // /:orgId/console (note: no unprefixed /console — that's the real admin
+    // app, handled below) is the same device-grant QR/code page as /device,
+    // just redirecting to /console on completion instead of / — see
+    // deviceroutes.ts. Matched here, before the generic /console handling
+    // further down, so it never reaches the admin-app proxy.
     if (
       path === '/device' ||
       path.startsWith('/device/') ||
       /^\/[^/]+\/device$/.test(path) ||
-      /^\/[^/]+\/device\/start$/.test(path)
+      /^\/[^/]+\/device\/start$/.test(path) ||
+      /^\/[^/]+\/console$/.test(path)
     ) {
       const deviceHandler = new DeviceRoutesHandler(sessionStore, env);
       return deviceHandler.processDeviceRoute(request);

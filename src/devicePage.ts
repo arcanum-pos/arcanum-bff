@@ -1,4 +1,13 @@
-export const DEVICE_PAGE_HTML = `<!doctype html>
+// Serves both the kiosk device-login page (redirectTo: '/') and, for an org
+// whose identity provider only supports the device grant (e.g. a Google
+// "TV and Limited Input" client, which can't do the authorization-code flow
+// at all), the same QR/code flow repurposed for admin-portal login
+// (redirectTo: '/console') — see /:orgId/console in deviceroutes.ts. Both
+// variants POST/poll the exact same org-scoped /device/start and
+// /device/poll endpoints; only the page's own path (used to derive
+// deviceStartUrl) and post-completion destination differ.
+export function renderDevicePage(redirectTo: string): string {
+  return `<!doctype html>
 <html lang="nl">
 <head>
 <meta charset="UTF-8" />
@@ -70,14 +79,15 @@ export const DEVICE_PAGE_HTML = `<!doctype html>
     const statusEl = document.getElementById('status');
     const retryBtn = document.getElementById('retry-btn');
 
-    // This page is served at either /device (platform default) or
-    // /<orgId>/device (that org's own identity provider) — derive the
-    // matching /device/start URL from wherever this page itself was
-    // loaded from, so an org-scoped page actually starts an org-scoped
-    // login rather than always falling back to the default. /device/poll
+    // This page is served at /device, /<orgId>/device, or /<orgId>/console
+    // (see devicePage.ts) — regardless of which, the matching start
+    // endpoint is always /device/start under whatever prefix this page
+    // itself was loaded from, so strip only the page's own last path
+    // segment rather than assuming it's literally "/device". /device/poll
     // deliberately stays a single global path: the org is carried in the
     // pollId's own stored session server-side, so it needs no prefix.
-    const deviceStartUrl = window.location.pathname.replace(/\\/device$/, '') + '/device/start';
+    const deviceStartUrl = window.location.pathname.replace(/\\/[^/]+$/, '') + '/device/start';
+    const redirectTo = ${JSON.stringify(redirectTo)};
 
     let pollTimer = null;
 
@@ -99,7 +109,7 @@ export const DEVICE_PAGE_HTML = `<!doctype html>
 
           if (data.status === 'complete') {
             setStatus('Aangemeld! Doorsturen...', 'complete');
-            window.location.href = '/';
+            window.location.href = redirectTo;
             return;
           }
 
@@ -154,3 +164,4 @@ export const DEVICE_PAGE_HTML = `<!doctype html>
 </body>
 </html>
 `;
+}
