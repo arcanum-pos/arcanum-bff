@@ -25,6 +25,7 @@ export class DeviceRoutesHandler {
       clientSecret: idp.clientSecret,
       endpoints: idp.endpoints,
       issuerUrl: idp.issuerUrl,
+      scope: idp.scope,
     });
   }
 

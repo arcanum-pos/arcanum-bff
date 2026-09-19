@@ -11,6 +11,7 @@ export class OAuthHandler {
   private userinfoEndpoint: string;
   private connection?: string;
   private issuerUrl: string;
+  private scope: string;
 
   constructor(private sessionStore: SessionStore, settings: OAuthSettings) {
     this.clientId = settings.OAUTH_CLIENT_ID;
@@ -21,6 +22,11 @@ export class OAuthHandler {
     this.userinfoEndpoint = settings.endpoints.userinfoEndpoint;
     this.connection = settings.OAUTH_CONNECTION;
     this.issuerUrl = settings.issuerUrl;
+    // Auth0 needs 'offline_access' in scope to issue a refresh token; Google
+    // rejects that scope outright (invalid_scope) and has no equivalent for
+    // the authorization-code flow (only its device grant issues refresh
+    // tokens by default). Overridable per org — see identity_providers.scopes.
+    this.scope = settings.scope ?? 'openid profile email offline_access';
   }
 
   async login(orgId: string): Promise<[string, string]> {
@@ -36,7 +42,7 @@ export class OAuthHandler {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: 'openid profile email offline_access',
+      scope: this.scope,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       state: tempSessionId,

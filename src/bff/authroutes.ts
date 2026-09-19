@@ -21,6 +21,7 @@ export class AuthRoutesHandler {
       REDIRECT_URI: `${this.env.FRONTEND_URL}/callback`,
       OAUTH_CONNECTION: idp.connectionName,
       issuerUrl: idp.issuerUrl,
+      scope: idp.scope,
       endpoints: idp.endpoints,
     };
     return new OAuthHandler(this.sessionStore, settings);

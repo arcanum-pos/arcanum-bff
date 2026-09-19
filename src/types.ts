@@ -108,6 +108,7 @@ export interface OAuthSettings {
   REDIRECT_URI: string;
   OAUTH_CONNECTION?: string;
   issuerUrl: string;
+  scope?: string;
   endpoints: OAuthEndpoints;
 }
 
@@ -136,6 +137,7 @@ export interface IdpSettings {
   clientId: string;
   clientSecret: string;
   connectionName?: string;
+  scope?: string;
   endpoints: OAuthEndpoints;
 }
 
@@ -150,6 +152,7 @@ export async function resolveIdpSettings(orgId: string, env: Env): Promise<IdpSe
     clientId: string;
     clientSecret: string;
     connectionName: string | null;
+    scopes: string | null;
     endpoints: {
       authorization_endpoint: string;
       token_endpoint: string;
@@ -164,6 +167,7 @@ export async function resolveIdpSettings(orgId: string, env: Env): Promise<IdpSe
     clientId: data.clientId,
     clientSecret: data.clientSecret,
     connectionName: data.connectionName ?? undefined,
+    scope: data.scopes ?? undefined,
     endpoints: {
       authEndpoint: data.endpoints.authorization_endpoint,
       tokenEndpoint: data.endpoints.token_endpoint,

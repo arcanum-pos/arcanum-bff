@@ -7,6 +7,7 @@ export interface DeviceFlowSettings {
   clientSecret: string;
   endpoints: OAuthEndpoints;
   issuerUrl: string;
+  scope?: string;
 }
 
 export interface DeviceStartResult {
@@ -29,6 +30,7 @@ export class DeviceFlowHandler {
   private tokenEndpoint: string;
   private userinfoEndpoint: string;
   private issuerUrl: string;
+  private scope: string;
 
   constructor(private sessionStore: SessionStore, settings: DeviceFlowSettings) {
     this.clientId = settings.clientId;
@@ -37,6 +39,10 @@ export class DeviceFlowHandler {
     this.tokenEndpoint = settings.endpoints.tokenEndpoint;
     this.userinfoEndpoint = settings.endpoints.userinfoEndpoint;
     this.issuerUrl = settings.issuerUrl;
+    // See auth.ts's identical comment: 'offline_access' is an Auth0-ism
+    // Google's device endpoint rejects with invalid_scope. Overridable per
+    // org — see identity_providers.scopes.
+    this.scope = settings.scope ?? 'openid profile email offline_access';
   }
 
   async start(orgId: string): Promise<DeviceStartResult | { error: string }> {
@@ -47,7 +53,7 @@ export class DeviceFlowHandler {
     // enabled for this Application in the Auth0 dashboard.
     const params = new URLSearchParams({
       client_id: this.clientId,
-      scope: 'openid profile email offline_access',
+      scope: this.scope,
     });
 
     const response = await fetch(this.deviceCodeEndpoint, {
@@ -65,10 +71,24 @@ export class DeviceFlowHandler {
     const data = (await response.json()) as {
       device_code: string;
       user_code: string;
-      verification_uri_complete: string;
+      // RFC 8628 defines verification_uri (+ optional verification_uri_complete,
+      // which embeds the code so scanning it needs no manual entry). Auth0
+      // returns verification_uri_complete; Google's TV/limited-input flow only
+      // ever returns the legacy, non-standard verification_url — a bare link
+      // with no code embedded, so the user still types user_code by hand
+      // after scanning (already shown as text regardless — see devicePage.ts).
+      verification_uri_complete?: string;
+      verification_uri?: string;
+      verification_url?: string;
       expires_in: number;
       interval: number;
     };
+
+    const verificationUriComplete = data.verification_uri_complete ?? data.verification_uri ?? data.verification_url;
+    if (!verificationUriComplete) {
+      console.error('Device code response has no verification URI of any known shape', data);
+      return { error: 'Kon apparaatcode niet aanmaken' };
+    }
 
     const pollId = await this.sessionStore.create(
       { deviceCode: data.device_code, type: 'device_poll', orgId } satisfies DevicePollSessionData,
@@ -78,7 +98,7 @@ export class DeviceFlowHandler {
     return {
       pollId,
       userCode: data.user_code,
-      verificationUriComplete: data.verification_uri_complete,
+      verificationUriComplete,
       interval: data.interval || 5,
       expiresIn: data.expires_in,
     };
