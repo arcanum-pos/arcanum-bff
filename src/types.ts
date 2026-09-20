@@ -95,12 +95,30 @@ export interface PkceSessionData {
   // stored (see authroutes.ts's sanitizeReturnTo) so a crafted /login?
   // returnTo= can't turn this into an open redirect.
   returnTo?: string;
+  // Set only when this org uses the shared/default IdP (so the OAuth
+  // round trip is stuck bouncing through FRONTEND_URL) AND the browser
+  // arrived via this exact custom domain — /callback then hands the
+  // session off to this host via a short-lived token instead of finishing
+  // on FRONTEND_URL. Unset for everything else (no custom domain, or an
+  // org with its own IdP client already redirecting straight to its own
+  // domain — see authroutes.ts's startLogin).
+  returnHost?: string;
 }
 
 export interface DevicePollSessionData {
   deviceCode: string;
   type: 'device_poll';
   orgId: string;
+}
+
+// Created at /callback when a session-handoff redirect is issued (see
+// PkceSessionData.returnHost) — a short-lived (60s), single-use indirection
+// so the real session id never appears in a URL (browser history, referrer,
+// server logs on the receiving domain). /session-handoff deletes this on
+// first read.
+export interface HandoffSessionData {
+  type: 'session_handoff';
+  realSessionId: string;
 }
 
 export interface OAuthEndpoints {
@@ -143,6 +161,18 @@ export function isSessionData(data: SessionData | NormalizedIdentity | string): 
 // happens here: worker already resolved and persisted the endpoints at
 // admin-save time, so this is just a service-binding round trip.
 export interface IdpSettings {
+  // The real org id — resolved by worker from whatever identifier was sent
+  // (a real id, a slug, or now a custom domain), never that raw identifier
+  // itself. See resolveIdpSettings.
+  orgId: string;
+  // This org's own custom domain, if it has one — set regardless of
+  // whether isOwnIdp is true, so the caller can decide on a handoff even
+  // when using the shared/default IdP's credentials.
+  customDomain: string | null;
+  // True only when these credentials are this org's own (not the
+  // platform-default fallback) — the one case where a dynamic,
+  // this-org's-own-domain redirect_uri is safe (see authroutes.ts).
+  isOwnIdp: boolean;
   issuerUrl: string;
   clientId: string;
   clientSecret: string;
@@ -151,18 +181,27 @@ export interface IdpSettings {
   endpoints: OAuthEndpoints;
 }
 
+// `orgIdentifier` is whatever questo-bff has on hand to name the org: a real
+// id, a slug, or — for an unprefixed /login or /device/start — the
+// request's own Host header, tried last. Worker resolves whichever one
+// actually matches (see resolveOrgIdOrSlug) and returns the real id in
+// IdpSettings.orgId; nothing here needs to know which kind it sent.
+//
 // `purpose` picks which of an org's OAuth clients to use — 'authcode' for
 // the browser flow (/login, /:orgId/console), 'device' for the device grant
 // (/:orgId/device). Some providers (Google) require a separate client per
 // flow; worker resolves the actual override, this just says which one it
 // wants — see identity-providers.ts's resolveIdentityProviderForAuth.
-export async function resolveIdpSettings(orgId: string, env: Env, purpose: 'device' | 'authcode'): Promise<IdpSettings> {
-  const res = await callWorker(env, `/organizations/${encodeURIComponent(orgId)}/identity-provider/resolve?purpose=${purpose}`);
+export async function resolveIdpSettings(orgIdentifier: string, env: Env, purpose: 'device' | 'authcode'): Promise<IdpSettings> {
+  const res = await callWorker(env, `/organizations/${encodeURIComponent(orgIdentifier)}/identity-provider/resolve?purpose=${purpose}`);
   if (!res.ok) {
-    throw new Error(`Failed to resolve identity provider for org '${orgId}': ${res.status}`);
+    throw new Error(`Failed to resolve identity provider for org '${orgIdentifier}': ${res.status}`);
   }
 
   const data = (await res.json()) as {
+    orgId: string;
+    customDomain: string | null;
+    isOwnIdp: boolean;
     issuerUrl: string;
     clientId: string;
     clientSecret: string;
@@ -178,6 +217,9 @@ export async function resolveIdpSettings(orgId: string, env: Env, purpose: 'devi
   };
 
   return {
+    orgId: data.orgId,
+    customDomain: data.customDomain,
+    isOwnIdp: data.isOwnIdp,
     issuerUrl: data.issuerUrl,
     clientId: data.clientId,
     clientSecret: data.clientSecret,

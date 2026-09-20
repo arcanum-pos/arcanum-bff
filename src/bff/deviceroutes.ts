@@ -1,4 +1,4 @@
-import type { Env, SessionData, DevicePollSessionData } from '../types';
+import type { Env, SessionData, DevicePollSessionData, IdpSettings } from '../types';
 import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
 import { DeviceFlowHandler } from './device';
@@ -18,15 +18,19 @@ function json(body: unknown, status = 200, extraHeaders?: Record<string, string>
 export class DeviceRoutesHandler {
   constructor(private sessionStore: SessionStore, private env: Env) {}
 
-  private async buildDeviceHandler(orgId: string): Promise<DeviceFlowHandler> {
-    const idp = await resolveIdpSettings(orgId, this.env, 'device');
-    return new DeviceFlowHandler(this.sessionStore, {
+  // `orgIdentifier` may be a real id, a slug, or (for the unprefixed
+  // /device/start) the request's own Host header — lets a kiosk physically
+  // pointed at a branded domain use the right client with no slug needed.
+  private async buildDeviceHandler(orgIdentifier: string): Promise<{ device: DeviceFlowHandler; idp: IdpSettings }> {
+    const idp = await resolveIdpSettings(orgIdentifier, this.env, 'device');
+    const device = new DeviceFlowHandler(this.sessionStore, {
       clientId: idp.clientId,
       clientSecret: idp.clientSecret,
       endpoints: idp.endpoints,
       issuerUrl: idp.issuerUrl,
       scope: idp.scope,
     });
+    return { device, idp };
   }
 
   // /device/poll doesn't know which org a given attempt was for except by
@@ -57,12 +61,14 @@ export class DeviceRoutesHandler {
       });
     }
 
-    // Matches both /device/start and /:orgId/device/start.
+    // Matches both /device/start and /:orgId/device/start. For the
+    // unprefixed form, try the request's own Host header before falling
+    // back to the literal DEFAULT_ORG_ID.
     const startMatch = path.match(/^\/(?:([^/]+)\/)?device\/start$/);
     if (startMatch && request.method === 'POST') {
-      const orgId = startMatch[1] || DEFAULT_ORG_ID;
-      const device = await this.buildDeviceHandler(orgId);
-      const result = await device.start(orgId);
+      const orgIdentifier = startMatch[1] || request.headers.get('Host') || DEFAULT_ORG_ID;
+      const { device, idp } = await this.buildDeviceHandler(orgIdentifier);
+      const result = await device.start(idp.orgId);
       if ('error' in result) return json(result, 502);
       return json(result);
     }
@@ -72,7 +78,7 @@ export class DeviceRoutesHandler {
       if (!pollId) return json({ status: 'error', message: 'Ontbrekende aanvraag-id' }, 400);
 
       const orgId = await this.peekPollOrgId(pollId);
-      const device = await this.buildDeviceHandler(orgId);
+      const { device } = await this.buildDeviceHandler(orgId);
       const [result, sessionData] = await device.poll(pollId);
 
       if (result.status === 'complete' && sessionData) {

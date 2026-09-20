@@ -59,6 +59,7 @@ export default {
       path === '/login' ||
       path === '/callback' ||
       path === '/logout' ||
+      path === '/session-handoff' ||
       /^\/[^/]+\/login$/.test(path) ||
       /^\/[^/]+\/console$/.test(path)
     ) {
