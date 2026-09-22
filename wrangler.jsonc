@@ -20,17 +20,15 @@
 			"service": "arcanum-backend"
 		},
 		{
-			"binding": "WEBAPP_SERVICE",
-			"service": "arcanum-webapp"
-		},
-		{
 			"binding": "DEVICEHUB_SERVICE",
 			"service": "arcanum-devicehub"
 		},
 		{
-			// The admin portal (repo: questo-console) — served at /console.
-			// questo-webapp's old /admin.html and /admin-org.html pages it
-			// replaced have been removed.
+			// Every UI screen (admin portal at /console, kassa, settings,
+			// transactions, the customer display, the SumUp simulator, the
+			// org/device chooser, the login prompt, the device-grant QR page)
+			// now lives here — arcanum-webapp has nothing left to serve and
+			// no longer has a binding.
 			"binding": "CONSOLE_SERVICE",
 			"service": "arcanum-frontends"
 		}

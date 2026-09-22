@@ -165,12 +165,10 @@ export default {
       return chooserProxy.handleRequest(request, path);
     }
 
-    // The SumUp simulator and customer display (CFD) moved to
-    // arcanum-frontends (simulator.html / display.html) — kassa.html stays
-    // on WEBAPP_SERVICE below until it moves too. display.html keeps its
-    // path exactly: kassa's "Klantscherm openen" button opens
-    // /display.html?terminal=<id> directly.
-    if (path === '/simulator.html' || path === '/display.html') {
+    // Everything arcanum-webapp used to serve has now moved here too —
+    // display.html keeps its path exactly: kassa's "Klantscherm openen"
+    // button opens /display.html?terminal=<id> directly.
+    if (path === '/simulator.html' || path === '/display.html' || path === '/kassa.html' || path === '/settings.html' || path === '/transactions.html') {
       const movedScreenProxy = new UIFrontendProxy(env, {
         service: env.CONSOLE_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
@@ -179,12 +177,7 @@ export default {
       return movedScreenProxy.handleRequest(request, path);
     }
 
-    const uiProxy = new UIFrontendProxy(env, {
-      service: env.WEBAPP_SERVICE,
-      localUrl: env.UIPROXY_URL,
-      fallbackFile: '/index.html',
-    });
-    return uiProxy.handleRequest(request, path);
+    return new Response(null, { status: 404 });
   },
 };
 

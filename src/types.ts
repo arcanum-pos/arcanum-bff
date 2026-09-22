@@ -22,7 +22,6 @@ export interface Env {
   // hitting /login burns through the Workers KV free-tier daily write quota.
   LOGIN_RATE_LIMITER?: RateLimit;
   // Service bindings
-  WEBAPP_SERVICE: Fetcher;
   BANCONTACT_SERVICE: Fetcher;
   DEVICEHUB_SERVICE: Fetcher;
   // The admin portal (questo-admin, Vite/React/shadcn) — reached at /console.
@@ -45,7 +44,6 @@ export interface Env {
   BFF_INTERNAL_KEY: string;
   // Local `wrangler dev` HTTP fallbacks (set via .dev.vars only, unused in production
   // where service bindings are used instead)
-  UIPROXY_URL?: string;
   BANCONTACT_LOCAL_URL?: string;
   DEVICEHUB_LOCAL_URL?: string;
   CONSOLE_LOCAL_URL?: string;
