@@ -3,8 +3,7 @@ import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
 import { DeviceFlowHandler } from './device';
 import { buildSessionCookie } from './cookie';
-import { DEVICE_PAGE_HTML } from '../devicePage';
-import { QRCODE_BUNDLE_JS } from '../assets/qrcodeBundle';
+import { UIFrontendProxy } from '../services/uiProxy';
 
 const DEFAULT_ORG_ID = 'default';
 
@@ -47,18 +46,17 @@ export class DeviceRoutesHandler {
     const path = url.pathname;
 
     // Matches both /device (group 1 undefined -> DEFAULT_ORG_ID) and
-    // /:orgId/device — same static page either way; its own script computes
-    // the matching /device/start URL from window.location (see
-    // devicePage.ts).
+    // /:orgId/device — same static page either way (arcanum-frontends'
+    // device.html); its own script computes the matching /device/start URL
+    // from window.location.
     const deviceMatch = path.match(/^\/(?:([^/]+)\/)?device$/);
     if (deviceMatch && request.method === 'GET') {
-      return new Response(DEVICE_PAGE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-    }
-
-    if (path === '/device/qrcode.js' && request.method === 'GET') {
-      return new Response(QRCODE_BUNDLE_JS, {
-        headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
+      const deviceProxy = new UIFrontendProxy(this.env, {
+        service: this.env.CONSOLE_SERVICE,
+        localUrl: this.env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/device.html',
       });
+      return deviceProxy.handleRequest(request, path);
     }
 
     // Matches both /device/start and /:orgId/device/start. For the

@@ -108,16 +108,27 @@ export default {
       // session on every hit. That silently burned through the Workers KV free-tier
       // daily write quota. Requiring an actual click means only a real login attempt
       // costs a KV write.
-      return new Response(loginPromptHtml(path), { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      //
+      // The prompt itself is arcanum-frontends' login-prompt.html (a real,
+      // always-present built file — no fallback needed), read client-side
+      // off window.location.pathname for its own returnTo, since it's
+      // served at whatever path was originally requested.
+      const promptProxy = new UIFrontendProxy(env, {
+        service: env.CONSOLE_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/login-prompt.html',
+      });
+      const prompt = await promptProxy.handleRequest(request, '/login-prompt.html');
+      return new Response(prompt.body, { status: 401, headers: prompt.headers });
     }
 
-    // The admin portal (questo-admin) lives at /console — questo-webapp's
+    // The admin portal (arcanum-admin) lives at /console — questo-webapp's
     // old /admin.html and /admin-org.html pages it replaced are gone. Same
     // auth gate as any other UI path above, just a different backend.
-    // /assets/* is questo-admin's own Vite build's asset prefix (distinct
-    // from questo-webapp's Astro output, which uses /_astro/*), so it's
-    // routed here regardless of which page loaded it — every entry
-    // questo-admin ever adds shares this one dist/assets/ folder.
+    // /assets/* is arcanum-frontends' own Vite build's asset prefix (shared
+    // by every entry it builds — admin, chooser, device, login-prompt —
+    // distinct from questo-webapp's Astro output, which uses /_astro/*), so
+    // it's routed here regardless of which page loaded it.
     if (path === '/console' || path.startsWith('/console/') || path.startsWith('/assets/')) {
       const consoleProxy = new UIFrontendProxy(env, {
         service: env.CONSOLE_SERVICE,
@@ -125,6 +136,20 @@ export default {
         fallbackFile: '/admin.html',
       });
       return consoleProxy.handleRequest(request, path);
+    }
+
+    // Root "/" — the org + device-role chooser (arcanum-frontends'
+    // chooser.html), authenticated at this point (the public branch above
+    // already returned). Its own script checks localStorage first and
+    // redirects straight to kassa/display/simulator.html if this browser is
+    // already registered as a terminal.
+    if (path === '/') {
+      const chooserProxy = new UIFrontendProxy(env, {
+        service: env.CONSOLE_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/chooser.html',
+      });
+      return chooserProxy.handleRequest(request, path);
     }
 
     const uiProxy = new UIFrontendProxy(env, {
@@ -157,22 +182,6 @@ function corsResponse(response: Response, request: Request, env: Env): Response 
   return out;
 }
 
-// Carries the originally-requested path through /login so /callback lands
-// the browser back where it was headed (e.g. /console) instead of always
-// the root chooser — see authroutes.ts's sanitizeReturnTo for why this is
-// safe to build straight from `path` (already a browser-parsed pathname).
-function loginPromptHtml(returnTo: string): string {
-  const href = returnTo && returnTo !== '/' ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login';
-  return `<!DOCTYPE html>
-<html lang="nl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aanmelden vereist</title>
-<style>body{font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;background:#f5f5f5}
-a{display:inline-block;padding:.75rem 1.5rem;background:#1a73e8;color:#fff;text-decoration:none;border-radius:.5rem;font-weight:600}</style>
-</head>
-<body><a href="${href}">Aanmelden om verder te gaan</a></body>
-</html>`;
-}
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {

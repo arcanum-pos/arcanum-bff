@@ -76,7 +76,8 @@ export class DeviceFlowHandler {
       // returns verification_uri_complete; Google's TV/limited-input flow only
       // ever returns the legacy, non-standard verification_url — a bare link
       // with no code embedded, so the user still types user_code by hand
-      // after scanning (already shown as text regardless — see devicePage.ts).
+      // after scanning (already shown as text regardless — see
+      // arcanum-frontends' src/apps/device/App.tsx).
       verification_uri_complete?: string;
       verification_uri?: string;
       verification_url?: string;
