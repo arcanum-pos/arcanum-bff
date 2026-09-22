@@ -1,9 +1,9 @@
-// Direct (non-proxy) calls from questo-bff to `worker`'s own internal-only
+// Direct (non-proxy) calls from arcanum-bff to `worker`'s own internal-only
 // routes — distinct from ServiceProxy, which forwards an already-established
 // user session/identity. This is used pre-authentication (there is no
 // session yet), so it carries BFF_INTERNAL_KEY instead of any user identity
 // — mirrors worker's own devicehub-client.ts pattern for its calls to
-// questo-devicehub (a separate secret from that one, though: a different
+// arcanum-devicehub (a separate secret from that one, though: a different
 // pairwise relationship).
 import type { Env } from '../types';
 

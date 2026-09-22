@@ -138,7 +138,7 @@ export default {
       return new Response(prompt.body, { status: 401, headers: prompt.headers });
     }
 
-    // The admin portal (arcanum-admin) lives at /console — questo-webapp's
+    // The admin portal (arcanum-frontends) lives at /console — arcanum-webapp's
     // old /admin.html and /admin-org.html pages it replaced are gone. Same
     // auth gate as any other UI path above, just a different backend.
     // (/assets/* — its Vite build output — is handled earlier, unauthenticated.)

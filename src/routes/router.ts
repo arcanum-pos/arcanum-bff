@@ -19,7 +19,7 @@ const ROUTES: RouteDefinition[] = [
     rewritePath: { from: '/api/bancontact', to: '' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
   },
-  // Device registration/linking/ws-token — a separate Worker (questo-devicehub)
+  // Device registration/linking/ws-token — a separate Worker (arcanum-devicehub)
   // from payment processing, on purpose. The WebSocket itself (/devices/connect)
   // is NOT proxied here: clients open it directly against that worker's public
   // URL using the short-lived token returned by /api/devices/ws-token, deliberately

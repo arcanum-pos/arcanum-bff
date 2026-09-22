@@ -9,8 +9,8 @@ export interface UIProxyTarget {
   service?: Fetcher;
   localUrl?: string;
   // Served (as a 200) for any request this backend 404s on and that isn't
-  // itself a static asset — the client-side-routing fallback. questo-webapp
-  // (Astro, one real HTML file per page) uses /index.html; questo-admin
+  // itself a static asset — the client-side-routing fallback. arcanum-webapp
+  // (Astro, one real HTML file per page) used /index.html; arcanum-frontends
   // (Vite, one real HTML file per *app*) uses /admin.html for anything
   // under /console, since it has no /index.html at all.
   fallbackFile: string;

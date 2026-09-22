@@ -42,7 +42,7 @@ export interface Env {
   // Authorizes calls to worker's internal-only identity-provider-resolution
   // route (see services/workerClient.ts) — must match worker's own
   // BFF_INTERNAL_KEY secret. Deliberately separate from worker's own
-  // INTERNAL_API_KEY (which authorizes its calls to questo-devicehub) —
+  // INTERNAL_API_KEY (which authorizes its calls to arcanum-devicehub) —
   // a different pairwise relationship, independently rotatable.
   BFF_INTERNAL_KEY: string;
   // Local `wrangler dev` HTTP fallbacks (set via .dev.vars only, unused in production
@@ -137,7 +137,7 @@ export function isSessionData(data: SessionData | NormalizedIdentity | string): 
   return typeof data === 'object' && 'access_token' in data;
 }
 
-// What questo-bff needs to actually drive a login for one org: that org's
+// What arcanum-bff needs to actually drive a login for one org: that org's
 // own configured identity provider if it has one, otherwise the platform
 // default's (resolved by worker — see worker/src/organizations/
 // identity-providers.ts resolveIdentityProviderForAuth). No discovery fetch
@@ -162,7 +162,7 @@ export interface IdpSettings {
   endpoints: OAuthEndpoints;
 }
 
-// `orgIdentifier` is whatever questo-bff has on hand to name the org: a real
+// `orgIdentifier` is whatever arcanum-bff has on hand to name the org: a real
 // id, or — for an unprefixed /login or /device/start — the request's own
 // Host header, tried last. Worker resolves whichever one actually matches
 // (see resolveOrgId) and returns the real id in IdpSettings.orgId; nothing
