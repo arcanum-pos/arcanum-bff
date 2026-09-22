@@ -167,8 +167,11 @@ export default {
 
     // Everything arcanum-webapp used to serve has now moved here too —
     // display.html keeps its path exactly: kassa's "Klantscherm openen"
-    // button opens /display.html?terminal=<id> directly.
-    if (path === '/simulator.html' || path === '/display.html' || path === '/kassa.html' || path === '/settings.html' || path === '/transactions.html') {
+    // button opens /display.html?terminal=<id> directly. transactions.html
+    // was dropped (not moved) — the admin portal's own Rapporten page
+    // (routes/reports.tsx) already covers this, org-wide rather than
+    // per-device/slot-scoped.
+    if (path === '/simulator.html' || path === '/display.html' || path === '/kassa.html' || path === '/settings.html') {
       const movedScreenProxy = new UIFrontendProxy(env, {
         service: env.CONSOLE_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
