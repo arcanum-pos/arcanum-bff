@@ -79,6 +79,22 @@ export default {
       return deviceHandler.processDeviceRoute(request);
     }
 
+    // arcanum-frontends' shared Vite asset prefix — JS/CSS for every entry
+    // it builds (admin, chooser, device, login-prompt), public by nature
+    // (compiled client code, nothing sensitive). Has to be checked before
+    // the auth gate below, not just alongside /console's own routing:
+    // device.html and login-prompt.html are themselves served before/
+    // without a session, so their own <script>/<link> tags need these to
+    // load unauthenticated too.
+    if (path.startsWith('/assets/')) {
+      const assetsProxy = new UIFrontendProxy(env, {
+        service: env.CONSOLE_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/admin.html',
+      });
+      return assetsProxy.handleRequest(request, path);
+    }
+
     const auth = await authresult(request, env, sessionStore);
 
     if (path === '/whoami') {
@@ -125,11 +141,8 @@ export default {
     // The admin portal (arcanum-admin) lives at /console — questo-webapp's
     // old /admin.html and /admin-org.html pages it replaced are gone. Same
     // auth gate as any other UI path above, just a different backend.
-    // /assets/* is arcanum-frontends' own Vite build's asset prefix (shared
-    // by every entry it builds — admin, chooser, device, login-prompt —
-    // distinct from questo-webapp's Astro output, which uses /_astro/*), so
-    // it's routed here regardless of which page loaded it.
-    if (path === '/console' || path.startsWith('/console/') || path.startsWith('/assets/')) {
+    // (/assets/* — its Vite build output — is handled earlier, unauthenticated.)
+    if (path === '/console' || path.startsWith('/console/')) {
       const consoleProxy = new UIFrontendProxy(env, {
         service: env.CONSOLE_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
