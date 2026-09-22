@@ -165,6 +165,17 @@ export default {
       return chooserProxy.handleRequest(request, path);
     }
 
+    // The SumUp simulator moved to arcanum-frontends (simulator.html) —
+    // kassa.html/display.html stay on WEBAPP_SERVICE below until they move too.
+    if (path === '/simulator.html') {
+      const simulatorProxy = new UIFrontendProxy(env, {
+        service: env.CONSOLE_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/simulator.html',
+      });
+      return simulatorProxy.handleRequest(request, path);
+    }
+
     const uiProxy = new UIFrontendProxy(env, {
       service: env.WEBAPP_SERVICE,
       localUrl: env.UIPROXY_URL,
