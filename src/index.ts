@@ -79,6 +79,25 @@ export default {
       return deviceHandler.processDeviceRoute(request);
     }
 
+    // The notification WebSocket — public/no-session by design (see
+    // arcanum-devicehub's own comment on WS_TOKEN_SECRET: the channel only
+    // ever relays an event name + id, never real data, and the connect step
+    // itself verifies a short-lived signed token minted by the
+    // session-checked /api/devices/ws-token). Used to live on
+    // arcanum-devicehub's own public custom domain — moved here so a kiosk
+    // on an org's own custom domain talks to that same domain for
+    // everything, not a separate arcanum-devicehub.kaboutersoft.be hostname.
+    // devicehub's own connect handler does the token verification and DO
+    // upgrade; this is a pure byte-forwarding hop, not a proxy that needs to
+    // understand the protocol.
+    if (path === '/devices/connect') {
+      const isDevelopment = env.FRONTEND_URL?.includes('localhost') || env.FRONTEND_URL?.includes('127.0.0.1');
+      if (isDevelopment && env.DEVICEHUB_LOCAL_URL) {
+        return fetch(new Request(`${env.DEVICEHUB_LOCAL_URL}${path}${url.search}`, request));
+      }
+      return env.ARCANUM_DEVICEHUB_SERVICE.fetch(new Request(`https://devicehub${path}${url.search}`, request));
+    }
+
     // arcanum-frontends' shared Vite asset prefix — JS/CSS for every entry
     // it builds (admin, chooser, device, login-prompt), public by nature
     // (compiled client code, nothing sensitive). Has to be checked before

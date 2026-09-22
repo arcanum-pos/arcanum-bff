@@ -21,9 +21,10 @@ const ROUTES: RouteDefinition[] = [
   },
   // Device registration/linking/ws-token — a separate Worker (arcanum-devicehub)
   // from payment processing, on purpose. The WebSocket itself (/devices/connect)
-  // is NOT proxied here: clients open it directly against that worker's public
-  // URL using the short-lived token returned by /api/devices/ws-token, deliberately
-  // bypassing session auth for that one, low-privilege, notification-only channel.
+  // is a different, unprefixed route (see index.ts) — public/no-session by
+  // design, using the short-lived token minted by /api/devices/ws-token
+  // (session-checked, right here) instead. Deliberately not under /api/devices
+  // so it isn't gated by this route's requireAuth.
   {
     pattern: /^\/api\/devices(\/|$)/,
     service: 'ARCANUM_DEVICEHUB_SERVICE',

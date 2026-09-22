@@ -12,21 +12,29 @@ Browser
   └─ arcanum.kaboutersoft.be/*  → arcanum-bff
        ├─ /login /callback /logout /device*   → Auth0 / an org's own IdP
        ├─ /whoami                             → current session identity
+       ├─ /devices/connect                    → service binding → arcanum-devicehub
+       │    (the notification WebSocket — public/no-session, see index.ts)
        ├─ /api/bancontact/* /api/organizations/* /api/callback/*  (see
        │    src/routes/router.ts)             → service binding → arcanum-backend
        ├─ /api/devices/*                      → service binding → arcanum-devicehub
        └─ /console, /, /kassa.html, /settings.html, /device, /simulator.html,
             /display.html, and every arcanum-frontends asset  (auth'd, except
-            /device* and the login prompt itself)
+            /device*, /devices/connect, and the login prompt itself)
                                                → service binding → arcanum-frontends
 ```
+
+This same-origin routing is also what lets an org's own custom domain work
+for every screen *and* the notification channel — every custom domain routes
+to this Worker, so nothing here is tied to `arcanum.kaboutersoft.be`
+specifically.
 
 Service bindings (see `wrangler.jsonc`):
 - `ARCANUM_BACKEND_SERVICE` → `arcanum-backend` (payments, organizations/admin
   API, provider callbacks)
 - `ARCANUM_DEVICEHUB_SERVICE` → `arcanum-devicehub` (device registration/
-  linking; the notification WebSocket itself is opened directly against that
-  Worker's own public URL, bypassing this BFF)
+  linking, and the notification WebSocket itself — forwarded through this BFF
+  rather than a separate arcanum-devicehub hostname, so it follows whichever
+  domain the browser is on)
 - `ARCANUM_FRONTENDS_SERVICE` → `arcanum-frontends` (every UI screen)
 
 No Auth0 `audience` / API scopes requested — this app doesn't use Auth0 for
