@@ -16,20 +16,20 @@
 	],
 	"services": [
 		{
-			"binding": "BANCONTACT_SERVICE",
+			"binding": "ARCANUM_BACKEND_SERVICE",
 			"service": "arcanum-backend"
 		},
 		{
-			"binding": "DEVICEHUB_SERVICE",
+			"binding": "ARCANUM_DEVICEHUB_SERVICE",
 			"service": "arcanum-devicehub"
 		},
 		{
-			// Every UI screen (admin portal at /console, kassa, settings,
-			// transactions, the customer display, the SumUp simulator, the
-			// org/device chooser, the login prompt, the device-grant QR page)
-			// now lives here — arcanum-webapp has nothing left to serve and
-			// no longer has a binding.
-			"binding": "CONSOLE_SERVICE",
+			// Every UI screen (admin portal at /console, kassa, settings, the
+			// customer display, the SumUp simulator, the org/device chooser,
+			// the login prompt, the device-grant QR page) lives here —
+			// arcanum-webapp has nothing left to serve and no longer has a
+			// binding.
+			"binding": "ARCANUM_FRONTENDS_SERVICE",
 			"service": "arcanum-frontends"
 		}
 	],

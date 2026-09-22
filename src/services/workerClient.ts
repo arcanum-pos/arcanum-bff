@@ -21,5 +21,5 @@ export async function callWorker(env: Env, path: string, init: RequestInit = {})
   if (isDevelopment(env) && env.BANCONTACT_LOCAL_URL) {
     return fetch(`${env.BANCONTACT_LOCAL_URL}${path}`, { ...init, headers });
   }
-  return env.BANCONTACT_SERVICE.fetch(`https://worker${path}`, { ...init, headers });
+  return env.ARCANUM_BACKEND_SERVICE.fetch(`https://worker${path}`, { ...init, headers });
 }

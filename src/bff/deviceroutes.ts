@@ -52,7 +52,7 @@ export class DeviceRoutesHandler {
     const deviceMatch = path.match(/^\/(?:([^/]+)\/)?device$/);
     if (deviceMatch && request.method === 'GET') {
       const deviceProxy = new UIFrontendProxy(this.env, {
-        service: this.env.CONSOLE_SERVICE,
+        service: this.env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: this.env.CONSOLE_LOCAL_URL,
         fallbackFile: '/device.html',
       });

@@ -22,11 +22,14 @@ export interface Env {
   // hitting /login burns through the Workers KV free-tier daily write quota.
   LOGIN_RATE_LIMITER?: RateLimit;
   // Service bindings
-  BANCONTACT_SERVICE: Fetcher;
-  DEVICEHUB_SERVICE: Fetcher;
-  // The admin portal (questo-admin, Vite/React/shadcn) — reached at /console.
-  // Optional: unset in an environment that hasn't deployed it yet.
-  CONSOLE_SERVICE?: Fetcher;
+  ARCANUM_BACKEND_SERVICE: Fetcher;
+  ARCANUM_DEVICEHUB_SERVICE: Fetcher;
+  // Every UI screen (admin portal, kassa, settings, the customer display, the
+  // SumUp simulator, the org/device chooser, the login prompt, the
+  // device-grant QR page) — reached at /console and a handful of other
+  // explicit paths, see index.ts. Optional: unset in an environment that
+  // hasn't deployed it yet.
+  ARCANUM_FRONTENDS_SERVICE?: Fetcher;
   // Still used by authresult.ts's Bearer-token auth path (validateAuth0Bearer)
   // — deliberately scoped to the platform's one original tenant only, not
   // yet multi-issuer-aware. Everything else (login, device, refresh,

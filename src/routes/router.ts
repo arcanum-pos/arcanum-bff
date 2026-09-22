@@ -14,7 +14,7 @@ interface RouteDefinition {
 const ROUTES: RouteDefinition[] = [
   {
     pattern: /^\/api\/bancontact(\/|$)/,
-    service: 'BANCONTACT_SERVICE',
+    service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: true,
     rewritePath: { from: '/api/bancontact', to: '' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
@@ -26,7 +26,7 @@ const ROUTES: RouteDefinition[] = [
   // bypassing session auth for that one, low-privilege, notification-only channel.
   {
     pattern: /^\/api\/devices(\/|$)/,
-    service: 'DEVICEHUB_SERVICE',
+    service: 'ARCANUM_DEVICEHUB_SERVICE',
     requireAuth: true,
     rewritePath: { from: '/api/devices', to: '/devices' },
     localUrlEnv: 'DEVICEHUB_LOCAL_URL',
@@ -38,7 +38,7 @@ const ROUTES: RouteDefinition[] = [
   // identity header this proxy already attaches below.
   {
     pattern: /^\/api\/organizations(\/|$)/,
-    service: 'BANCONTACT_SERVICE',
+    service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: true,
     rewritePath: { from: '/api/organizations', to: '/organizations' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
@@ -52,7 +52,7 @@ const ROUTES: RouteDefinition[] = [
   // here — this proxy is just an unauthenticated pipe for this one prefix.
   {
     pattern: /^\/api\/callback(\/|$)/,
-    service: 'BANCONTACT_SERVICE',
+    service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: false,
     rewritePath: { from: '/api/callback', to: '/callback' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',

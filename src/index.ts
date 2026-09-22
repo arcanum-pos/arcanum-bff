@@ -88,7 +88,7 @@ export default {
     // load unauthenticated too.
     if (path.startsWith('/assets/')) {
       const assetsProxy = new UIFrontendProxy(env, {
-        service: env.CONSOLE_SERVICE,
+        service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
         fallbackFile: '/admin.html',
       });
@@ -130,7 +130,7 @@ export default {
       // off window.location.pathname for its own returnTo, since it's
       // served at whatever path was originally requested.
       const promptProxy = new UIFrontendProxy(env, {
-        service: env.CONSOLE_SERVICE,
+        service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
         fallbackFile: '/login-prompt.html',
       });
@@ -144,7 +144,7 @@ export default {
     // (/assets/* — its Vite build output — is handled earlier, unauthenticated.)
     if (path === '/console' || path.startsWith('/console/')) {
       const consoleProxy = new UIFrontendProxy(env, {
-        service: env.CONSOLE_SERVICE,
+        service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
         fallbackFile: '/admin.html',
       });
@@ -158,7 +158,7 @@ export default {
     // already registered as a terminal.
     if (path === '/') {
       const chooserProxy = new UIFrontendProxy(env, {
-        service: env.CONSOLE_SERVICE,
+        service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
         fallbackFile: '/chooser.html',
       });
@@ -173,7 +173,7 @@ export default {
     // per-device/slot-scoped.
     if (path === '/simulator.html' || path === '/display.html' || path === '/kassa.html' || path === '/settings.html') {
       const movedScreenProxy = new UIFrontendProxy(env, {
-        service: env.CONSOLE_SERVICE,
+        service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
         fallbackFile: path,
       });
