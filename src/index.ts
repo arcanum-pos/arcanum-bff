@@ -39,7 +39,7 @@ export default {
       return corsResponse(jsonResponse({ error: 'Not found' }, 404), request, env);
     }
 
-    const sessionStore = new CloudflareKVSessionStore(env.QUESTO_SESSIONS);
+    const sessionStore = new CloudflareKVSessionStore(env.ARCANUM_SESSIONS);
 
     // /login and /device (+ /device/start) also have an org-scoped variant,
     // /:orgId/login and /:orgId/device(/start) — the only entry points that

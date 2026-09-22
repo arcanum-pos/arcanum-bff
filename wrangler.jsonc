@@ -10,7 +10,7 @@
 	},
 	"kv_namespaces": [
 		{
-			"binding": "QUESTO_SESSIONS",
+			"binding": "ARCANUM_SESSIONS",
 			"id": "9c4625a8e89b46a4a37bbd48bd1a2abe"
 		}
 	],

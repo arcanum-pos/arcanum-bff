@@ -8,9 +8,9 @@
     "typecheck": "tsc",
     "tail": "wrangler tail",
     "secret:put": "wrangler secret put",
-    "kv:put": "wrangler kv:key put --binding=QUESTO_SESSIONS",
-    "kv:get": "wrangler kv:key get --binding=QUESTO_SESSIONS",
-    "kv:list": "wrangler kv:key list --binding=QUESTO_SESSIONS"
+    "kv:put": "wrangler kv:key put --binding=ARCANUM_SESSIONS",
+    "kv:get": "wrangler kv:key get --binding=ARCANUM_SESSIONS",
+    "kv:list": "wrangler kv:key list --binding=ARCANUM_SESSIONS"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260911.1",

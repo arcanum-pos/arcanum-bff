@@ -52,7 +52,7 @@ npm install
 ### 3. Create the sessions KV namespace
 
 ```bash
-npx wrangler kv namespace create QUESTO_SESSIONS
+npx wrangler kv namespace create ARCANUM_SESSIONS
 ```
 
 This prints an `id`. Put it into `wrangler.jsonc`'s `kv_namespaces` entry.

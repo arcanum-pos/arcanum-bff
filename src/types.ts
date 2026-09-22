@@ -16,7 +16,7 @@ export interface NormalizedIdentity {
 
 export interface Env {
   // KV namespaces
-  QUESTO_SESSIONS: KVNamespace;
+  ARCANUM_SESSIONS: KVNamespace;
   // Caps PKCE-session KV writes per IP on /login — a temp KV session is created
   // there before any authentication happens, so without this, scanner/bot traffic
   // hitting /login burns through the Workers KV free-tier daily write quota.
