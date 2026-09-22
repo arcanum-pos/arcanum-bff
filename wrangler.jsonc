@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "wrk-questo-bff",
+	"name": "arcanum-bff",
 	"workers_dev": true,
 	"main": "src/index.ts",
 	"compatibility_date": "2025-07-18",
@@ -17,22 +17,22 @@
 	"services": [
 		{
 			"binding": "BANCONTACT_SERVICE",
-			"service": "questo-bancontact-worker"
+			"service": "arcanum-backend"
 		},
 		{
 			"binding": "WEBAPP_SERVICE",
-			"service": "questo-webapp"
+			"service": "arcanum-webapp"
 		},
 		{
 			"binding": "DEVICEHUB_SERVICE",
-			"service": "questo-devicehub"
+			"service": "arcanum-devicehub"
 		},
 		{
 			// The admin portal (repo: questo-console) — served at /console.
 			// questo-webapp's old /admin.html and /admin-org.html pages it
 			// replaced have been removed.
 			"binding": "CONSOLE_SERVICE",
-			"service": "questo-frontends"
+			"service": "arcanum-frontends"
 		}
 	],
 	"ratelimits": [
