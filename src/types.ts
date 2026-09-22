@@ -95,30 +95,12 @@ export interface PkceSessionData {
   // stored (see authroutes.ts's sanitizeReturnTo) so a crafted /login?
   // returnTo= can't turn this into an open redirect.
   returnTo?: string;
-  // Set only when this org uses the shared/default IdP (so the OAuth
-  // round trip is stuck bouncing through FRONTEND_URL) AND the browser
-  // arrived via this exact custom domain — /callback then hands the
-  // session off to this host via a short-lived token instead of finishing
-  // on FRONTEND_URL. Unset for everything else (no custom domain, or an
-  // org with its own IdP client already redirecting straight to its own
-  // domain — see authroutes.ts's startLogin).
-  returnHost?: string;
 }
 
 export interface DevicePollSessionData {
   deviceCode: string;
   type: 'device_poll';
   orgId: string;
-}
-
-// Created at /callback when a session-handoff redirect is issued (see
-// PkceSessionData.returnHost) — a short-lived (60s), single-use indirection
-// so the real session id never appears in a URL (browser history, referrer,
-// server logs on the receiving domain). /session-handoff deletes this on
-// first read.
-export interface HandoffSessionData {
-  type: 'session_handoff';
-  realSessionId: string;
 }
 
 export interface OAuthEndpoints {
@@ -162,12 +144,10 @@ export function isSessionData(data: SessionData | NormalizedIdentity | string): 
 // admin-save time, so this is just a service-binding round trip.
 export interface IdpSettings {
   // The real org id — resolved by worker from whatever identifier was sent
-  // (a real id, a slug, or now a custom domain), never that raw identifier
-  // itself. See resolveIdpSettings.
+  // (a real id, or a custom domain), never that raw identifier itself. See
+  // resolveIdpSettings.
   orgId: string;
-  // This org's own custom domain, if it has one — set regardless of
-  // whether isOwnIdp is true, so the caller can decide on a handoff even
-  // when using the shared/default IdP's credentials.
+  // This org's own custom domain, if it has one.
   customDomain: string | null;
   // True only when these credentials are this org's own (not the
   // platform-default fallback) — the one case where a dynamic,
@@ -182,10 +162,10 @@ export interface IdpSettings {
 }
 
 // `orgIdentifier` is whatever questo-bff has on hand to name the org: a real
-// id, a slug, or — for an unprefixed /login or /device/start — the
-// request's own Host header, tried last. Worker resolves whichever one
-// actually matches (see resolveOrgIdOrSlug) and returns the real id in
-// IdpSettings.orgId; nothing here needs to know which kind it sent.
+// id, or — for an unprefixed /login or /device/start — the request's own
+// Host header, tried last. Worker resolves whichever one actually matches
+// (see resolveOrgId) and returns the real id in IdpSettings.orgId; nothing
+// here needs to know which kind it sent.
 //
 // `purpose` picks which of an org's OAuth clients to use — 'authcode' for
 // the browser flow (/login, /:orgId/console), 'device' for the device grant

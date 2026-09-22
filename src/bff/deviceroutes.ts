@@ -18,9 +18,9 @@ function json(body: unknown, status = 200, extraHeaders?: Record<string, string>
 export class DeviceRoutesHandler {
   constructor(private sessionStore: SessionStore, private env: Env) {}
 
-  // `orgIdentifier` may be a real id, a slug, or (for the unprefixed
-  // /device/start) the request's own Host header — lets a kiosk physically
-  // pointed at a branded domain use the right client with no slug needed.
+  // `orgIdentifier` may be a real id, or (for the unprefixed /device/start)
+  // the request's own Host header — lets a kiosk physically pointed at a
+  // branded domain use the right client with no org identifier needed.
   private async buildDeviceHandler(orgIdentifier: string): Promise<{ device: DeviceFlowHandler; idp: IdpSettings }> {
     const idp = await resolveIdpSettings(orgIdentifier, this.env, 'device');
     const device = new DeviceFlowHandler(this.sessionStore, {

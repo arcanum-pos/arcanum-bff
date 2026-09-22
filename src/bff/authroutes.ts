@@ -1,4 +1,4 @@
-import type { Env, SessionData, PkceSessionData, HandoffSessionData, OAuthSettings, IdpSettings } from '../types';
+import type { Env, SessionData, PkceSessionData, OAuthSettings, IdpSettings } from '../types';
 import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
 import { OAuthHandler } from './auth';
@@ -20,7 +20,11 @@ export class AuthRoutesHandler {
   // *that org* controls what's registered as an allowed callback on *their*
   // client. The shared/default IdP has exactly one registered callback and
   // can never vary per org, so isOwnIdp being false always keeps the fixed
-  // FRONTEND_URL one, however this was reached.
+  // FRONTEND_URL one, however this was reached. (worker enforces that a
+  // custom domain always implies an org's own complete IdP config — see
+  // custom-domain.ts's setCustomDomain — so in practice `idp.customDomain`
+  // alone already implies `idp.isOwnIdp`; both are still checked here as
+  // cheap defense in depth.)
   private async buildOAuthHandler(orgIdentifier: string): Promise<{ oauth: OAuthHandler; idp: IdpSettings }> {
     const idp = await resolveIdpSettings(orgIdentifier, this.env, 'authcode');
     const redirectUri = idp.isOwnIdp && idp.customDomain ? `https://${idp.customDomain}/callback` : `${this.env.FRONTEND_URL}/callback`;
@@ -37,14 +41,13 @@ export class AuthRoutesHandler {
     return { oauth: new OAuthHandler(this.sessionStore, settings), idp };
   }
 
-  // /callback doesn't know which org (or intended destination/handoff) a
-  // given login attempt was for except by reading it back out of the PKCE
-  // session `state` refers to — so peek at it here, before building the
-  // handler that will redo that same lookup (and delete it) inside
-  // oauth.callback().
-  private async peekPkceSession(state: string): Promise<{ orgId: string; returnTo: string; returnHost?: string }> {
+  // /callback doesn't know which org (or intended destination) a given
+  // login attempt was for except by reading it back out of the PKCE session
+  // `state` refers to — so peek at it here, before building the handler
+  // that will redo that same lookup (and delete it) inside oauth.callback().
+  private async peekPkceSession(state: string): Promise<{ orgId: string; returnTo: string }> {
     const data = (await this.sessionStore.get(state)) as PkceSessionData | null;
-    return { orgId: data?.orgId || DEFAULT_ORG_ID, returnTo: sanitizeReturnTo(data?.returnTo), returnHost: data?.returnHost };
+    return { orgId: data?.orgId || DEFAULT_ORG_ID, returnTo: sanitizeReturnTo(data?.returnTo) };
   }
 
   async processAuthRoute(request: Request): Promise<Response> {
@@ -53,9 +56,9 @@ export class AuthRoutesHandler {
 
     // Matches both /login and /:orgId/login. For the unprefixed form, try
     // the request's own Host header before falling back to the literal
-    // DEFAULT_ORG_ID — this is what lets a custom domain log in without a
-    // slug at all (see organizations.ts's resolveOrgIdOrSlug on the worker
-    // side, which now also checks custom_domain).
+    // DEFAULT_ORG_ID — this is what lets a custom domain log in with no org
+    // identifier in the URL at all (see organizations.ts's resolveOrgId on
+    // the worker side).
     const loginMatch = path.match(/^\/(?:([^/]+)\/)?login$/);
     if (loginMatch) {
       const orgIdentifier = loginMatch[1] || request.headers.get('Host') || DEFAULT_ORG_ID;
@@ -74,7 +77,7 @@ export class AuthRoutesHandler {
 
     if (path === '/callback') {
       const params = Object.fromEntries(url.searchParams.entries());
-      const { orgId, returnTo, returnHost } = await this.peekPkceSession(params.state ?? '');
+      const { orgId, returnTo } = await this.peekPkceSession(params.state ?? '');
       const { oauth, idp } = await this.buildOAuthHandler(orgId);
       const [userSessionData, error] = await oauth.callback(params.code ?? '', params.state ?? '');
 
@@ -88,33 +91,15 @@ export class AuthRoutesHandler {
       const newSessionId = await this.sessionStore.create(userSessionData satisfies SessionData, this.env.SESSION_TTL);
       const cookieHeaders = { 'Set-Cookie': buildSessionCookie(this.env, newSessionId) };
 
-      // Three cases, in order: (1) the shared/default IdP was used but the
-      // browser arrived via a custom domain — this callback is stuck on
-      // FRONTEND_URL (the one registered callback), so hand the session off
-      // to that domain via a short-lived, single-use token rather than the
-      // real session id. (2) this org has its own IdP client and its own
-      // custom domain — redirect_uri was already that domain, so this
-      // callback IS being served there; just finish normally, absolute URL
-      // for clarity. (3) no custom domain involved at all — today's
-      // original behavior.
-      let location: string;
-      if (returnHost) {
-        const handoffToken = await this.sessionStore.create(
-          { type: 'session_handoff', realSessionId: newSessionId } satisfies HandoffSessionData,
-          60
-        );
-        location = `https://${returnHost}/session-handoff?token=${handoffToken}&returnTo=${encodeURIComponent(returnTo)}`;
-      } else if (idp.isOwnIdp && idp.customDomain) {
-        location = `https://${idp.customDomain}${returnTo}`;
-      } else {
-        location = `${this.env.FRONTEND_URL}${returnTo}`;
-      }
+      // This org has its own IdP client and its own custom domain —
+      // redirect_uri was already that domain (see buildOAuthHandler), so
+      // this callback IS being served there; finish normally with an
+      // absolute URL for clarity. Otherwise (shared/default IdP, no custom
+      // domain involved), land on FRONTEND_URL as always.
+      const location =
+        idp.isOwnIdp && idp.customDomain ? `https://${idp.customDomain}${returnTo}` : `${this.env.FRONTEND_URL}${returnTo}`;
 
       return new Response(null, { status: 302, headers: { Location: location, ...cookieHeaders } });
-    }
-
-    if (path === '/session-handoff') {
-      return this.handleSessionHandoff(url);
     }
 
     if (path === '/logout') {
@@ -165,8 +150,8 @@ export class AuthRoutesHandler {
 
   // Shared by /login, /:orgId/login, and /:orgId/console — all three start
   // the exact same authorization-code flow, differing only in which org and
-  // where the browser lands afterward. `orgIdentifier` may be a real id, a
-  // slug, or (for the unprefixed paths) the request's own Host header —
+  // where the browser lands afterward. `orgIdentifier` may be a real id, or
+  // (for the unprefixed paths) the request's own Host header —
   // buildOAuthHandler resolves whichever it is and hands back the real id.
   private async startLogin(orgIdentifier: string, returnTo: string, request: Request): Promise<Response> {
     if (!(await this.checkRateLimit(request))) {
@@ -178,18 +163,7 @@ export class AuthRoutesHandler {
 
     const { oauth, idp } = await this.buildOAuthHandler(orgIdentifier);
 
-    // A handoff is only needed for the shared/default IdP (fixed
-    // redirect_uri) when the browser actually arrived via this org's own
-    // custom domain — checked against the request's real Host, not just
-    // "this org happens to have one configured", so an admin deliberately
-    // using the slug-based link on FRONTEND_URL directly isn't bounced
-    // somewhere they didn't ask to go. An org with its own IdP client
-    // already gets a redirect_uri on its own domain (see
-    // buildOAuthHandler) and needs no handoff at all.
-    const returnHost =
-      !idp.isOwnIdp && idp.customDomain && request.headers.get('Host') === idp.customDomain ? idp.customDomain : undefined;
-
-    const [authUrl, state] = await oauth.login(idp.orgId, returnTo, returnHost);
+    const [authUrl, state] = await oauth.login(idp.orgId, returnTo);
     return new Response(null, {
       status: 302,
       headers: {
@@ -206,32 +180,6 @@ export class AuthRoutesHandler {
     return success;
   }
 
-  // The receiving end of the handoff /callback issues when the shared/
-  // default IdP was used but the browser needs to end up on a custom
-  // domain instead (see the /callback branch above). `token` is opaque and
-  // single-use — deleted here on first read regardless of outcome, so it
-  // can never be replayed even if a copy of the URL leaks somewhere (this
-  // domain's own access logs, browser history).
-  private async handleSessionHandoff(url: URL): Promise<Response> {
-    const token = url.searchParams.get('token');
-    const returnTo = sanitizeReturnTo(url.searchParams.get('returnTo'));
-    if (!token) return new Response(null, { status: 302, headers: { Location: returnTo || '/' } });
-
-    const data = (await this.sessionStore.get(token)) as HandoffSessionData | null;
-    await this.sessionStore.delete(token);
-
-    if (!data || data.type !== 'session_handoff') {
-      // Expired or already used — nothing to hand off, land on the same
-      // page unauthenticated rather than error; the normal login prompt
-      // takes over from there.
-      return new Response(null, { status: 302, headers: { Location: returnTo || '/' } });
-    }
-
-    return new Response(null, {
-      status: 302,
-      headers: { Location: returnTo || '/', 'Set-Cookie': buildSessionCookie(this.env, data.realSessionId) },
-    });
-  }
 }
 
 function extractSessionId(request: Request): string | null {
