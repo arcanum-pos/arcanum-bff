@@ -30,6 +30,13 @@ export interface Env {
   // explicit paths, see index.ts. Optional: unset in an environment that
   // hasn't deployed it yet.
   ARCANUM_FRONTENDS_SERVICE?: Fetcher;
+  // arcanum-installer, at /installer/* (bff/installer.ts). Self-hosted
+  // installations only: arcanum-installer adds both when it uploads this
+  // Worker — deliberately not in wrangler.jsonc, where a binding to a
+  // Worker that doesn't exist would break the deploy. The key proves to
+  // the installer that the identity headers come from this BFF.
+  ARCANUM_INSTALLER_SERVICE?: Fetcher;
+  INSTALLER_INTERNAL_KEY?: string;
   // Still used by authresult.ts's Bearer-token auth path (validateAuth0Bearer)
   // — deliberately scoped to the platform's one original tenant only, not
   // yet multi-issuer-aware. Everything else (login, device, refresh,

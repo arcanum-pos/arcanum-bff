@@ -1,5 +1,22 @@
 import type { Env, AuthResult, RewritePath } from '../types';
 
+// `headers` starts as a copy of the client's own request headers, so a
+// client could set X-User-Sub/X-User-Issuer itself to impersonate another
+// org's member — always clear them first so a falsy `identity` can't leave
+// a client-forged value in place unrewritten.
+export function setIdentityHeaders(headers: Headers, authResult: AuthResult): void {
+  for (const h of ['X-User-Email', 'X-User-Sub', 'X-User-Issuer', 'X-User-Name', 'X-User-Roles']) {
+    headers.delete(h);
+  }
+  const { identity } = authResult;
+  if (!identity) return;
+  if (identity.email) headers.set('X-User-Email', identity.email);
+  if (identity.sub) headers.set('X-User-Sub', identity.sub);
+  if (identity.issuer) headers.set('X-User-Issuer', identity.issuer);
+  if (identity.name) headers.set('X-User-Name', identity.name);
+  if (identity.roles.length > 0) headers.set('X-User-Roles', identity.roles.join(','));
+}
+
 interface ForwardOptions {
   requireAuth?: boolean;
   rewritePath?: RewritePath;
@@ -40,23 +57,6 @@ export class ServiceProxy {
     return this.authResult.token || null;
   }
 
-  // `headers` starts as a copy of the client's own request headers, so a
-  // client could set X-User-Sub/X-User-Issuer itself to impersonate another
-  // org's member — always clear them first so a falsy `identity` can't leave
-  // a client-forged value in place unrewritten.
-  private setIdentityHeaders(headers: Headers): void {
-    for (const h of ['X-User-Email', 'X-User-Sub', 'X-User-Issuer', 'X-User-Name', 'X-User-Roles']) {
-      headers.delete(h);
-    }
-    const { identity } = this.authResult;
-    if (!identity) return;
-    if (identity.email) headers.set('X-User-Email', identity.email);
-    if (identity.sub) headers.set('X-User-Sub', identity.sub);
-    if (identity.issuer) headers.set('X-User-Issuer', identity.issuer);
-    if (identity.name) headers.set('X-User-Name', identity.name);
-    if (identity.roles.length > 0) headers.set('X-User-Roles', identity.roles.join(','));
-  }
-
   private async forwardViaHttp(request: Request, options: ForwardOptions): Promise<Response> {
     try {
       const token = this.getAccessToken();
@@ -73,7 +73,7 @@ export class ServiceProxy {
       headers.delete('Cookie');
       headers.set('X-Forwarded-By', 'bff-http');
       headers.set('X-Request-ID', crypto.randomUUID());
-      this.setIdentityHeaders(headers);
+      setIdentityHeaders(headers, this.authResult);
 
       const response = await fetch(fullUrl, {
         method: request.method,
@@ -96,7 +96,7 @@ export class ServiceProxy {
     newHeaders.delete('Cookie');
     newHeaders.set('X-Forwarded-By', 'bff');
     newHeaders.set('X-Request-ID', crypto.randomUUID());
-    this.setIdentityHeaders(newHeaders);
+    setIdentityHeaders(newHeaders, this.authResult);
 
     const url = new URL(request.url);
     url.pathname = this.applyRewritePath(url.pathname, options.rewritePath);

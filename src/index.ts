@@ -4,6 +4,7 @@ import { AuthRoutesHandler } from './bff/authroutes';
 import { DeviceRoutesHandler } from './bff/deviceroutes';
 import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
+import { forwardToInstaller, installerAvailable, isInstallerPath } from './bff/installer';
 import { Router, isKnownApiRoute, routeRequiresAuth } from './routes/router';
 
 // See LICENSE (AGPL-3.0-or-later) and the /version route below.
@@ -32,6 +33,8 @@ export default {
           // — the console/kassa "Broncode" links read it from here. An
           // installation running a modified version must point it at its own.
           source_url: env.SOURCE_URL || DEFAULT_SOURCE_URL,
+          // Whether /installer is reachable — the console shows its link.
+          installer: installerAvailable(env),
         }),
         request,
         env
@@ -47,6 +50,14 @@ export default {
     // Unknown /api/* paths are rejected before any auth work — route table is static and known.
     if (path.startsWith('/api') && !isKnownApiRoute(path)) {
       return corsResponse(jsonResponse({ error: 'Not found' }, 404), request, env);
+    }
+
+    // arcanum-installer behind this BFF (self-hosted installations only —
+    // see bff/installer.ts). Without it, as if the route didn't exist. The
+    // bare /installer redirects: the installer's page uses relative paths.
+    if (isInstallerPath(path)) {
+      if (!installerAvailable(env)) return new Response(null, { status: 404 });
+      if (path === '/installer') return Response.redirect(new URL(`/installer/${url.search}`, url).toString(), 302);
     }
 
     const sessionStore = new CloudflareKVSessionStore(env.ARCANUM_SESSIONS);
@@ -129,6 +140,15 @@ export default {
     if (path === '/whoami') {
       const result = await processWhoAmi(request, auth, env);
       return corsResponse(jsonResponse(result.data, result.status), request, env);
+    }
+
+    // Signed in: forward. Not signed in: the page gets the same login prompt
+    // as any other page (the public branch below), its API calls a 401.
+    if (isInstallerPath(path)) {
+      if (auth.authMethod !== 'public') return forwardToInstaller(request, env, auth);
+      if (!request.headers.get('Accept')?.includes('text/html')) {
+        return jsonResponse({ error: 'Unauthorized' }, 401);
+      }
     }
 
     if (path.startsWith('/api')) {

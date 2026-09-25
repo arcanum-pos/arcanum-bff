@@ -19,3 +19,7 @@ CONSOLE_LOCAL_URL=http://localhost:8791
 # Authorizes calls to worker's internal-only identity-provider-resolution
 # route — must match worker's own BFF_INTERNAL_KEY.
 BFF_INTERNAL_KEY=change-me-to-a-long-random-value
+
+# Set by arcanum-installer on self-hosted installations only (together with
+# the ARCANUM_INSTALLER_SERVICE binding) — leave empty: /installer then 404s.
+INSTALLER_INTERNAL_KEY=

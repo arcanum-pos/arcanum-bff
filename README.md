@@ -36,6 +36,11 @@ Service bindings (see `wrangler.jsonc`):
   rather than a separate arcanum-devicehub hostname, so it follows whichever
   domain the browser is on)
 - `ARCANUM_FRONTENDS_SERVICE` → `arcanum-frontends` (every UI screen)
+- `ARCANUM_INSTALLER_SERVICE` → `arcanum-installer`, at `/installer/*`
+  (signed-in only; the installer checks its own admin allowlist). Self-hosted
+  installations only: arcanum-installer adds this binding and the
+  `INSTALLER_INTERNAL_KEY` secret when it uploads this Worker — not in
+  `wrangler.jsonc`. Without both, `/installer` is a 404.
 
 No Auth0 `audience` / API scopes requested — this app doesn't use Auth0 for
 authorization, only authentication. Authorization (who can do what) is the
@@ -109,6 +114,13 @@ too (each via their own `wrangler dev`, on different ports — see
 `BANCONTACT_LOCAL_URL` / `DEVICEHUB_LOCAL_URL` / `CONSOLE_LOCAL_URL` in
 `.dev.vars` at wherever they're listening. In dev mode this Worker talks to
 them over plain HTTP instead of service bindings.
+
+## Tests
+
+```bash
+npm test          # Vitest in the Workers runtime (@cloudflare/vitest-pool-workers)
+npm run typecheck
+```
 
 ## Smoke test after deploying
 
