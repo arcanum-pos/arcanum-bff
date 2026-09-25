@@ -29,6 +29,8 @@ export default {
         jsonResponse({
           version: env.CF_VERSION_METADATA?.id ?? 'local',
           git_commit: env.GIT_COMMIT_SHA,
+          // The installed release, shown in the console footer; null = deployed from main.
+          release: env.ARCANUM_VERSION || null,
           // Where this installation's users get its source code (AGPL-3.0 §13)
           // — the console/kassa "Broncode" links read it from here. An
           // installation running a modified version must point it at its own.

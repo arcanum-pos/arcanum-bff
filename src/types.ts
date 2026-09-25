@@ -49,6 +49,9 @@ export interface Env {
   // Source code of what this installation runs (AGPL-3.0 §13), shown as the
   // app's "Broncode" link. Unset = the upstream repos.
   SOURCE_URL?: string;
+  // The Arcanum release this installation runs (e.g. "0.1.4") — set by
+  // arcanum-installer; unset when deployed straight from the repos (main).
+  ARCANUM_VERSION?: string;
   // Authorizes calls to worker's internal-only identity-provider-resolution
   // route (see services/workerClient.ts) — must match worker's own
   // BFF_INTERNAL_KEY secret. Deliberately separate from worker's own
