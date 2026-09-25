@@ -109,7 +109,7 @@ export class AuthRoutesHandler {
         await this.sessionStore.delete(sessionId);
       }
 
-      const clearCookieHeaders = { 'Set-Cookie': 'session_id=; Path=/; HttpOnly; Max-Age=0' };
+      const clearCookieHeaders = { 'Set-Cookie': 'session_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' };
 
       // Clearing our own session isn't enough — the identity provider may
       // keep its own SSO session cookie, so without an upstream logout call
@@ -168,7 +168,7 @@ export class AuthRoutesHandler {
       status: 302,
       headers: {
         Location: authUrl,
-        'Set-Cookie': `oauth_state=${state}; Path=/; HttpOnly; Max-Age=600`,
+        'Set-Cookie': `oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`,
       },
     });
   }
