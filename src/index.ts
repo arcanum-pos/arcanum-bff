@@ -45,7 +45,8 @@ export default {
 
     // Reject scanner probes before any session/auth work.
     // Paths with non-app file extensions (e.g. .php, .env, .asp) can never be valid routes here.
-    if (isScannedPath(path)) {
+    // /installer/* is the exception: the installer's own paths, behind a login (its step ids end in .json).
+    if (isScannedPath(path) && !isInstallerPath(path)) {
       return new Response(null, { status: 404 });
     }
 

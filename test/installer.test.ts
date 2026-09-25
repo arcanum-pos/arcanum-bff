@@ -138,6 +138,19 @@ describe('with the installer', () => {
     expect(res.headers.get('X-Installer')).toBe('echo');
   });
 
+  it("forwards installer paths that end in a file extension (step ids like assets:…-01.json) — the scanner filter doesn't apply", async () => {
+    const res = await SELF.fetch(`${BASE}/installer/api/steps/assets%3Aarcanum-frontends-assets-01.json`, {
+      method: 'POST',
+      headers: { Cookie: await signIn(), 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(res.status).toBe(299);
+    expect(((await res.json()) as Echo).path).toBe('/api/steps/assets%3Aarcanum-frontends-assets-01.json');
+    // Signed out it's still a 401, not forwarded; elsewhere the filter still holds.
+    expect((await SELF.fetch(`${BASE}/installer/api/steps/x.json`, { method: 'POST' })).status).toBe(401);
+    expect((await SELF.fetch(`${BASE}/wp-config.json`)).status).toBe(404);
+  });
+
   it('/installerx is not the installer', async () => {
     const res = await SELF.fetch(`${BASE}/installerx`, { headers: { Cookie: await signIn() } });
     expect(res.headers.get('X-Installer')).toBeNull();
