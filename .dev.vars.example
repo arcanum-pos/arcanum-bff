@@ -1,8 +1,6 @@
 # Copy this file to .dev.vars and fill in your values.
 # .dev.vars is git-ignored and must never be committed.
 
-OAUTH_CLIENT_ID=your-auth0-client-id
-OAUTH_CLIENT_SECRET=your-auth0-client-secret
 
 # Overrides the production FRONTEND_URL (set in wrangler.jsonc) for local dev.
 # The BFF is its own frontend now (single front door), so this is just where

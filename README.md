@@ -77,8 +77,6 @@ In `wrangler.jsonc`, set `vars.AUTH0_DOMAIN` to your tenant's domain (e.g.
 ### 5. Set secrets
 
 ```bash
-npx wrangler secret put OAUTH_CLIENT_ID
-npx wrangler secret put OAUTH_CLIENT_SECRET
 npx wrangler secret put BFF_INTERNAL_KEY
 ```
 
@@ -101,7 +99,7 @@ npx wrangler deploy
 ## Local development
 
 ```bash
-cp .dev.vars.example .dev.vars   # fill in OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET / BFF_INTERNAL_KEY
+cp .dev.vars.example .dev.vars   # fill in BFF_INTERNAL_KEY
 npm run dev
 ```
 

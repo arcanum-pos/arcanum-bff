@@ -36,8 +36,8 @@ export interface Env {
   // logout) now resolves via resolveIdpSettings instead.
   AUTH0_DOMAIN: string;
   SESSION_TTL: number;
-  OAUTH_CLIENT_ID: string;
-  OAUTH_CLIENT_SECRET: string;
+  // No OAUTH_CLIENT_ID/SECRET here anymore: every login flow gets its client
+  // credentials from arcanum-backend's resolved identity provider.
   FRONTEND_URL: string;
   // Authorizes calls to worker's internal-only identity-provider-resolution
   // route (see services/workerClient.ts) — must match worker's own
