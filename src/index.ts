@@ -5,6 +5,9 @@ import { DeviceRoutesHandler } from './bff/deviceroutes';
 import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
 import { Router, isKnownApiRoute, routeRequiresAuth } from './routes/router';
+
+// See LICENSE (AGPL-3.0-or-later) and the /version route below.
+const DEFAULT_SOURCE_URL = 'https://github.com/arcanum-pos';
 import { UIFrontendProxy } from './services/uiProxy';
 
 export default {
@@ -22,7 +25,14 @@ export default {
 
     if (path === '/version') {
       return corsResponse(
-        jsonResponse({ version: env.CF_VERSION_METADATA?.id ?? 'local', git_commit: env.GIT_COMMIT_SHA }),
+        jsonResponse({
+          version: env.CF_VERSION_METADATA?.id ?? 'local',
+          git_commit: env.GIT_COMMIT_SHA,
+          // Where this installation's users get its source code (AGPL-3.0 §13)
+          // — the console/kassa "Broncode" links read it from here. An
+          // installation running a modified version must point it at its own.
+          source_url: env.SOURCE_URL || DEFAULT_SOURCE_URL,
+        }),
         request,
         env
       );
