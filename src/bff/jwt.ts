@@ -13,3 +13,12 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
     return null;
   }
 }
+
+// The OIDC `email_verified` claim as true/false, or undefined when the
+// provider didn't send one (not every provider does). Some providers (AWS
+// Cognito, some Keycloak mappers) send it as the string "true"/"false".
+export function toEmailVerified(value: unknown): boolean | undefined {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return undefined;
+}

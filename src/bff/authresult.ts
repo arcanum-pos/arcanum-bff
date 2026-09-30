@@ -2,7 +2,7 @@ import type { Env, AuthResult, SessionData, NormalizedIdentity } from '../types'
 import { isSessionData } from '../types';
 import type { SessionStore } from './session';
 import { isTokenExpiringSoon, refreshUserToken } from './refresh';
-import { decodeJwtPayload } from './jwt';
+import { decodeJwtPayload, toEmailVerified } from './jwt';
 
 export async function authresult(request: Request, env: Env, sessionStore: SessionStore): Promise<AuthResult> {
   const bearerToken = extractBearerToken(request);
@@ -67,6 +67,7 @@ async function validateAuth0Bearer(token: string, env: Env): Promise<NormalizedI
       username: (userInfo.nickname as string) ?? (userInfo.email as string) ?? '',
       roles: [],
       issuer: `https://${env.AUTH0_DOMAIN}/`,
+      emailVerified: toEmailVerified(userInfo.email_verified),
     };
   } catch {
     return null;
@@ -96,6 +97,8 @@ function extractIdentityFromSession(sessionData: SessionData): NormalizedIdentit
     username: (payload.nickname as string) ?? (payload.email as string) ?? sessionData.email,
     roles: [],
     issuer: sessionData.issuer,
+    // The id_token's claim when it has one, else what userinfo said at login.
+    emailVerified: toEmailVerified(payload.email_verified) ?? sessionData.email_verified,
   };
 }
 

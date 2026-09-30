@@ -8,10 +8,13 @@ export interface NormalizedIdentity {
   lastName: string;
   username: string;
   roles: string[];
-  // Which issuer authenticated this identity — see worker's
-  // memberships.issuer for why bare sub isn't enough once an org can bring
-  // its own identity provider.
+  // Which issuer authenticated this identity — see arcanum-backend's
+  // memberships.issuer for why bare sub isn't enough.
   issuer: string;
+  // The provider's `email_verified` claim; undefined when it sent none.
+  // Forwarded as X-User-Email-Verified — the backend never activates a
+  // pending invite on an e-mail marked unverified.
+  emailVerified?: boolean;
 }
 
 export interface Env {
@@ -84,12 +87,13 @@ export interface SessionData {
   email: string;
   name: string;
   expires_at: number;
-  // Which org's identity provider authenticated this session ('default'
-  // until per-org routing exists), and that provider's real issuer URL —
-  // recorded once at /callback or /device/poll time, never re-derived from
-  // a token afterward. Needed to resolve the right settings again later
-  // (refresh, logout) and to forward X-User-Issuer to worker.
-  orgId: string;
+  // userinfo's `email_verified` at login, when the provider sent one — the
+  // fallback when the id_token doesn't carry the claim (authresult.ts).
+  email_verified?: boolean;
+  // The instance's issuer URL at login — recorded once at /callback or
+  // /device/poll time, never re-derived from a token afterward; forwarded as
+  // X-User-Issuer. (Sessions from before hosting-plan phase 6 also carry an
+  // `orgId` — no longer read.)
   issuer: string;
   // Which OAuth client actually issued this token — 'authcode' (/callback)
   // or 'device' (/device/poll). A provider that requires a separate client
@@ -103,7 +107,6 @@ export interface SessionData {
 export interface PkceSessionData {
   codeVerifier: string;
   type: 'oauth_pkce';
-  orgId: string;
   // Where to send the browser after a successful callback — defaults to
   // FRONTEND_URL (the root chooser) when unset. Sanitized before being
   // stored (see authroutes.ts's sanitizeReturnTo) so a crafted /login?
@@ -114,7 +117,6 @@ export interface PkceSessionData {
 export interface DevicePollSessionData {
   deviceCode: string;
   type: 'device_poll';
-  orgId: string;
 }
 
 export interface OAuthEndpoints {
@@ -150,23 +152,14 @@ export function isSessionData(data: SessionData | NormalizedIdentity | string): 
   return typeof data === 'object' && 'access_token' in data;
 }
 
-// What arcanum-bff needs to actually drive a login for one org: that org's
-// own configured identity provider if it has one, otherwise the platform
-// default's (resolved by worker — see worker/src/organizations/
-// identity-providers.ts resolveIdentityProviderForAuth). No discovery fetch
-// happens here: worker already resolved and persisted the endpoints at
-// admin-save time, so this is just a service-binding round trip.
+// What arcanum-bff needs to drive a login: the instance's identity provider
+// (arcanum-backend's `default` identity_providers row — one per
+// installation, for every org; see its organizations/identity-providers.ts).
+// No discovery fetch happens here: the backend resolved and persisted the
+// endpoints when it seeded the row, so this is just a service-binding round
+// trip. The browser always comes back to FRONTEND_URL (/callback), whatever
+// hostname it started on.
 export interface IdpSettings {
-  // The real org id — resolved by worker from whatever identifier was sent
-  // (a real id, or a custom domain), never that raw identifier itself. See
-  // resolveIdpSettings.
-  orgId: string;
-  // This org's own custom domain, if it has one.
-  customDomain: string | null;
-  // True only when these credentials are this org's own (not the
-  // platform-default fallback) — the one case where a dynamic,
-  // this-org's-own-domain redirect_uri is safe (see authroutes.ts).
-  isOwnIdp: boolean;
   issuerUrl: string;
   clientId: string;
   clientSecret: string;
@@ -175,27 +168,18 @@ export interface IdpSettings {
   endpoints: OAuthEndpoints;
 }
 
-// `orgIdentifier` is whatever arcanum-bff has on hand to name the org: a real
-// id, or — for an unprefixed /login or /device/start — the request's own
-// Host header, tried last. Worker resolves whichever one actually matches
-// (see resolveOrgId) and returns the real id in IdpSettings.orgId; nothing
-// here needs to know which kind it sent.
-//
-// `purpose` picks which of an org's OAuth clients to use — 'authcode' for
-// the browser flow (/login, /:orgId/console), 'device' for the device grant
-// (/:orgId/device). Some providers (Google) require a separate client per
-// flow; worker resolves the actual override, this just says which one it
-// wants — see identity-providers.ts's resolveIdentityProviderForAuth.
-export async function resolveIdpSettings(orgIdentifier: string, env: Env, purpose: 'device' | 'authcode'): Promise<IdpSettings> {
-  const res = await callWorker(env, `/organizations/${encodeURIComponent(orgIdentifier)}/identity-provider/resolve?purpose=${purpose}`);
+// GET /identity-provider/resolve?purpose=… on arcanum-backend (BFF_INTERNAL_KEY).
+// `purpose` picks the OAuth client — 'authcode' for the browser flow
+// (/login), 'device' for the device grant (/device). Some providers (Google)
+// require a separate client per flow; the backend resolves the actual
+// override, this just says which one it wants.
+export async function resolveIdpSettings(env: Env, purpose: 'device' | 'authcode'): Promise<IdpSettings> {
+  const res = await callWorker(env, `/identity-provider/resolve?purpose=${purpose}`);
   if (!res.ok) {
-    throw new Error(`Failed to resolve identity provider for org '${orgIdentifier}': ${res.status}`);
+    throw new Error(`Failed to resolve the identity provider: ${res.status}`);
   }
 
   const data = (await res.json()) as {
-    orgId: string;
-    customDomain: string | null;
-    isOwnIdp: boolean;
     issuerUrl: string;
     clientId: string;
     clientSecret: string;
@@ -211,9 +195,6 @@ export async function resolveIdpSettings(orgIdentifier: string, env: Env, purpos
   };
 
   return {
-    orgId: data.orgId,
-    customDomain: data.customDomain,
-    isOwnIdp: data.isOwnIdp,
     issuerUrl: data.issuerUrl,
     clientId: data.clientId,
     clientSecret: data.clientSecret,

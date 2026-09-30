@@ -5,12 +5,15 @@ import type { Env, AuthResult, RewritePath } from '../types';
 // org's member — always clear them first so a falsy `identity` can't leave
 // a client-forged value in place unrewritten.
 export function setIdentityHeaders(headers: Headers, authResult: AuthResult): void {
-  for (const h of ['X-User-Email', 'X-User-Sub', 'X-User-Issuer', 'X-User-Name', 'X-User-Roles']) {
+  for (const h of ['X-User-Email', 'X-User-Email-Verified', 'X-User-Sub', 'X-User-Issuer', 'X-User-Name', 'X-User-Roles']) {
     headers.delete(h);
   }
   const { identity } = authResult;
   if (!identity) return;
   if (identity.email) headers.set('X-User-Email', identity.email);
+  // The provider's email_verified claim — omitted when it sent none, so the
+  // backend can tell "unverified" from "unknown".
+  if (identity.email && identity.emailVerified !== undefined) headers.set('X-User-Email-Verified', String(identity.emailVerified));
   if (identity.sub) headers.set('X-User-Sub', identity.sub);
   if (identity.issuer) headers.set('X-User-Issuer', identity.issuer);
   if (identity.name) headers.set('X-User-Name', identity.name);

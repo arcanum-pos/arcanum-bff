@@ -2,15 +2,17 @@
 
 
 Backend-for-frontend for the Arcanum platform. Single front door on
-`arcanum.kaboutersoft.be`: handles login against Auth0 (or an org's own
-identity provider, once configured), then proxies everything else to the
+`arcanum.kaboutersoft.be` (or an own instance's address): handles login
+against the instance's identity provider — one per installation, for every
+org, resolved from arcanum-backend's `GET /identity-provider/resolve` — then
+proxies everything else to the
 platform's other Workers via service bindings, so none of them need to be
 publicly reachable.
 
 ```
 Browser
   └─ arcanum.kaboutersoft.be/*  → arcanum-bff
-       ├─ /login /callback /logout /device*   → Auth0 / an org's own IdP
+       ├─ /login /callback /logout /device*   → the instance's identity provider
        ├─ /whoami                             → current session identity
        ├─ /devices/connect                    → service binding → arcanum-devicehub
        │    (the notification WebSocket — public/no-session, see index.ts)
@@ -23,10 +25,15 @@ Browser
                                                → service binding → arcanum-frontends
 ```
 
-This same-origin routing is also what lets an org's own custom domain work
-for every screen *and* the notification channel — every custom domain routes
-to this Worker, so nothing here is tied to `arcanum.kaboutersoft.be`
-specifically.
+Every screen *and* the notification channel are same-origin, so nothing
+here is tied to `arcanum.kaboutersoft.be` specifically: an own instance runs
+on its workers.dev address or on the custom domain its installer attached.
+Login always redirects back to `FRONTEND_URL/callback` (the one address
+registered at the provider) — there is no per-org custom domain or per-org
+identity provider anymore (hosting plan phase 6). The bff forwards the
+caller's identity to the backend as `X-User-Sub`, `X-User-Issuer`,
+`X-User-Email`, `X-User-Name` and `X-User-Email-Verified` (`true`/`false`
+from the provider's `email_verified` claim; absent when it sent none).
 
 Service bindings (see `wrangler.jsonc`):
 - `ARCANUM_BACKEND_SERVICE` → `arcanum-backend` (payments, organizations/admin

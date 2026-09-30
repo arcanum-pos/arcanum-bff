@@ -65,27 +65,11 @@ export default {
 
     const sessionStore = new CloudflareKVSessionStore(env.ARCANUM_SESSIONS);
 
-    // /login and /device (+ /device/start) also have an org-scoped variant,
-    // /:orgId/login and /:orgId/device(/start) — the only entry points that
-    // need to know the org up front. /callback and /device/poll deliberately
-    // stay these exact global paths regardless: the org travels inside the
-    // short-lived PKCE/device-poll session created at start time, so
-    // resolving it again there needs no URL prefix (also means an org's own
-    // identity provider only ever needs the one, unprefixed redirect_uri
-    // registered — same as every org today).
-    //
-    // /:orgId/console (note: no unprefixed /console — that's the real admin
-    // app, handled below) is the authorization-code flow's counterpart to
-    // /:orgId/device: same login, always landing on /console instead of /.
-    // Matched here, before the generic /console handling further down, so
-    // it never reaches the admin-app proxy.
-    if (
-      path === '/login' ||
-      path === '/callback' ||
-      path === '/logout' ||
-      /^\/[^/]+\/login$/.test(path) ||
-      /^\/[^/]+\/console$/.test(path)
-    ) {
+    // Login against the instance's identity provider (one per installation,
+    // for every org — hosting plan phase 6 removed the per-org variants
+    // /:orgId/login, /:orgId/console and /:orgId/device). The provider always
+    // sends the browser back to FRONTEND_URL/callback.
+    if (path === '/login' || path === '/callback' || path === '/logout') {
       const authHandler = new AuthRoutesHandler(sessionStore, env);
       return authHandler.processAuthRoute(request);
     }
@@ -93,12 +77,7 @@ export default {
     // Device Authorization Grant: a kiosk device shows a QR/code, the user completes
     // login on their own phone, the kiosk polls until done. Public — no session/cookie
     // needed to start or poll, since the whole point is authenticating this device.
-    if (
-      path === '/device' ||
-      path.startsWith('/device/') ||
-      /^\/[^/]+\/device$/.test(path) ||
-      /^\/[^/]+\/device\/start$/.test(path)
-    ) {
+    if (path === '/device' || path.startsWith('/device/')) {
       const deviceHandler = new DeviceRoutesHandler(sessionStore, env);
       return deviceHandler.processDeviceRoute(request);
     }
@@ -109,8 +88,8 @@ export default {
     // itself verifies a short-lived signed token minted by the
     // session-checked /api/devices/ws-token). Used to live on
     // arcanum-devicehub's own public custom domain — moved here so a kiosk
-    // on an org's own custom domain talks to that same domain for
-    // everything, not a separate arcanum-devicehub.kaboutersoft.be hostname.
+    // talks to the one address it's on (the instance's custom domain or its
+    // workers.dev address) for everything, not a separate hostname.
     // devicehub's own connect handler does the token verification and DO
     // upgrade; this is a pure byte-forwarding hop, not a proxy that needs to
     // understand the protocol.

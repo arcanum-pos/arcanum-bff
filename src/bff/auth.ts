@@ -1,6 +1,6 @@
 import type { OAuthSettings, SessionData, PkceSessionData } from '../types';
 import type { SessionStore } from './session';
-import { decodeJwtPayload } from './jwt';
+import { decodeJwtPayload, toEmailVerified } from './jwt';
 
 export class OAuthHandler {
   private clientId: string;
@@ -25,16 +25,16 @@ export class OAuthHandler {
     // Auth0 needs 'offline_access' in scope to issue a refresh token; Google
     // rejects that scope outright (invalid_scope) and has no equivalent for
     // the authorization-code flow (only its device grant issues refresh
-    // tokens by default). Overridable per org — see identity_providers.scopes.
+    // tokens by default). Overridable per instance — see identity_providers.scopes.
     this.scope = settings.scope ?? 'openid profile email offline_access';
   }
 
-  async login(orgId: string, returnTo?: string): Promise<[string, string]> {
+  async login(returnTo?: string): Promise<[string, string]> {
     const codeVerifier = this._generateCodeVerifier();
     const codeChallenge = await this._generateCodeChallenge(codeVerifier);
 
     const tempSessionId = await this.sessionStore.create(
-      { codeVerifier, type: 'oauth_pkce', orgId, returnTo } satisfies PkceSessionData,
+      { codeVerifier, type: 'oauth_pkce', returnTo } satisfies PkceSessionData,
       600
     );
 
@@ -65,7 +65,7 @@ export class OAuthHandler {
         return [null, 'Invalid or expired state'];
       }
 
-      const { codeVerifier, orgId } = tempData;
+      const { codeVerifier } = tempData;
 
       const tokenResponse = await fetch(this.tokenEndpoint, {
         method: 'POST',
@@ -93,8 +93,7 @@ export class OAuthHandler {
         expires_in: number;
       };
 
-      // Confirms the token actually came from the issuer resolved for this
-      // org, before trusting anything else in it — guards against a
+      // Confirms the token actually came from the instance's issuer, before trusting anything else in it — guards against a
       // resolution bug or race silently minting a session against the
       // wrong identity provider.
       if (token.id_token) {
@@ -115,7 +114,7 @@ export class OAuthHandler {
         return [null, 'Failed to get user info'];
       }
 
-      const userInfo = (await userResponse.json()) as { email?: string; name?: string };
+      const userInfo = (await userResponse.json()) as { email?: string; name?: string; email_verified?: unknown };
 
       const sessionData: SessionData = {
         access_token: token.access_token,
@@ -124,7 +123,7 @@ export class OAuthHandler {
         email: userInfo.email ?? '',
         name: userInfo.name ?? '',
         expires_at: Date.now() / 1000 + token.expires_in,
-        orgId,
+        email_verified: toEmailVerified(userInfo.email_verified),
         issuer: this.issuerUrl,
         authPurpose: 'authcode',
       };

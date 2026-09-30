@@ -21,7 +21,6 @@ async function signIn(): Promise<string> {
     email: 'admin@example.test',
     name: 'Admin',
     expires_at: Math.floor(Date.now() / 1000) + 3600,
-    orgId: 'default',
     issuer: 'https://accounts.google.com',
     authPurpose: 'authcode',
   };

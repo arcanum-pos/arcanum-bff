@@ -1,84 +1,54 @@
-import type { Env, SessionData, PkceSessionData, OAuthSettings, IdpSettings } from '../types';
+import type { Env, SessionData, PkceSessionData, OAuthSettings } from '../types';
 import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
 import { OAuthHandler } from './auth';
 import { buildSessionCookie } from './cookie';
 
-const DEFAULT_ORG_ID = 'default';
-
 export class AuthRoutesHandler {
   constructor(private sessionStore: SessionStore, private env: Env) {}
 
-  // Builds an OAuthHandler for a specific org's resolved identity provider
-  // — replaces what used to be a single handler built once from this
-  // Worker's own hardcoded Auth0 vars. Always the authorization-code client
-  // — this class only ever drives that flow (device.ts is the device-grant
-  // counterpart).
+  // An OAuthHandler for the instance's identity provider — always the
+  // authorization-code client (device.ts is the device-grant counterpart).
   //
-  // redirect_uri is dynamic: an org with its OWN IdP client and its own
-  // custom domain gets `https://<that domain>/callback` — safe only because
-  // *that org* controls what's registered as an allowed callback on *their*
-  // client. The shared/default IdP has exactly one registered callback and
-  // can never vary per org, so isOwnIdp being false always keeps the fixed
-  // FRONTEND_URL one, however this was reached. (worker enforces that a
-  // custom domain always implies an org's own complete IdP config — see
-  // custom-domain.ts's setCustomDomain — so in practice `idp.customDomain`
-  // alone already implies `idp.isOwnIdp`; both are still checked here as
-  // cheap defense in depth.)
-  private async buildOAuthHandler(orgIdentifier: string): Promise<{ oauth: OAuthHandler; idp: IdpSettings }> {
-    const idp = await resolveIdpSettings(orgIdentifier, this.env, 'authcode');
-    const redirectUri = idp.isOwnIdp && idp.customDomain ? `https://${idp.customDomain}/callback` : `${this.env.FRONTEND_URL}/callback`;
+  // redirect_uri is always FRONTEND_URL/callback: an instance has exactly
+  // one address registered at its login provider — the shared tenant's, an
+  // own instance's workers.dev address, or the custom domain the installer
+  // gave the instance (which then becomes FRONTEND_URL). Never derived from
+  // the request's Host.
+  private async buildOAuthHandler(): Promise<OAuthHandler> {
+    const idp = await resolveIdpSettings(this.env, 'authcode');
     const settings: OAuthSettings = {
       OAUTH_CLIENT_ID: idp.clientId,
       OAUTH_CLIENT_SECRET: idp.clientSecret,
       FRONTEND_URL: this.env.FRONTEND_URL,
-      REDIRECT_URI: redirectUri,
+      REDIRECT_URI: `${this.env.FRONTEND_URL}/callback`,
       OAUTH_CONNECTION: idp.connectionName,
       issuerUrl: idp.issuerUrl,
       scope: idp.scope,
       endpoints: idp.endpoints,
     };
-    return { oauth: new OAuthHandler(this.sessionStore, settings), idp };
+    return new OAuthHandler(this.sessionStore, settings);
   }
 
-  // /callback doesn't know which org (or intended destination) a given
-  // login attempt was for except by reading it back out of the PKCE session
-  // `state` refers to — so peek at it here, before building the handler
-  // that will redo that same lookup (and delete it) inside oauth.callback().
-  private async peekPkceSession(state: string): Promise<{ orgId: string; returnTo: string }> {
+  // Where to land after /callback — stored in the PKCE session `state`
+  // refers to at /login time; peeked here before oauth.callback() deletes it.
+  private async peekReturnTo(state: string): Promise<string> {
     const data = (await this.sessionStore.get(state)) as PkceSessionData | null;
-    return { orgId: data?.orgId || DEFAULT_ORG_ID, returnTo: sanitizeReturnTo(data?.returnTo) };
+    return sanitizeReturnTo(data?.returnTo);
   }
 
   async processAuthRoute(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // Matches both /login and /:orgId/login. For the unprefixed form, try
-    // the request's own Host header before falling back to the literal
-    // DEFAULT_ORG_ID — this is what lets a custom domain log in with no org
-    // identifier in the URL at all (see organizations.ts's resolveOrgId on
-    // the worker side).
-    const loginMatch = path.match(/^\/(?:([^/]+)\/)?login$/);
-    if (loginMatch) {
-      const orgIdentifier = loginMatch[1] || request.headers.get('Host') || DEFAULT_ORG_ID;
-      const returnTo = sanitizeReturnTo(url.searchParams.get('returnTo'));
-      return this.startLogin(orgIdentifier, returnTo, request);
-    }
-
-    // /:orgId/console: the authorization-code flow's counterpart to
-    // /:orgId/device — same login, always landing on /console. No
-    // unprefixed /console variant: that's the actual admin app itself
-    // (handled in index.ts, never reaching AuthRoutesHandler).
-    const consoleLoginMatch = path.match(/^\/([^/]+)\/console$/);
-    if (consoleLoginMatch) {
-      return this.startLogin(consoleLoginMatch[1], '/console', request);
+    if (path === '/login') {
+      return this.startLogin(sanitizeReturnTo(url.searchParams.get('returnTo')), request);
     }
 
     if (path === '/callback') {
       const params = Object.fromEntries(url.searchParams.entries());
-      const { orgId, returnTo } = await this.peekPkceSession(params.state ?? '');
-      const { oauth, idp } = await this.buildOAuthHandler(orgId);
+      const returnTo = await this.peekReturnTo(params.state ?? '');
+      const oauth = await this.buildOAuthHandler();
       const [userSessionData, error] = await oauth.callback(params.code ?? '', params.state ?? '');
 
       if (error || !userSessionData) {
@@ -91,15 +61,7 @@ export class AuthRoutesHandler {
       const newSessionId = await this.sessionStore.create(userSessionData satisfies SessionData, this.env.SESSION_TTL);
       const cookieHeaders = { 'Set-Cookie': buildSessionCookie(this.env, newSessionId) };
 
-      // This org has its own IdP client and its own custom domain —
-      // redirect_uri was already that domain (see buildOAuthHandler), so
-      // this callback IS being served there; finish normally with an
-      // absolute URL for clarity. Otherwise (shared/default IdP, no custom
-      // domain involved), land on FRONTEND_URL as always.
-      const location =
-        idp.isOwnIdp && idp.customDomain ? `https://${idp.customDomain}${returnTo}` : `${this.env.FRONTEND_URL}${returnTo}`;
-
-      return new Response(null, { status: 302, headers: { Location: location, ...cookieHeaders } });
+      return new Response(null, { status: 302, headers: { Location: `${this.env.FRONTEND_URL}${returnTo}`, ...cookieHeaders } });
     }
 
     if (path === '/logout') {
@@ -118,9 +80,9 @@ export class AuthRoutesHandler {
       // exposes end_session_endpoint (OIDC RP-Initiated Logout) — not every
       // provider does, so falling back to just clearing our own cookie is
       // the correct behavior, not a degraded one.
-      if (sessionData?.orgId) {
+      if (sessionData) {
         try {
-          const idp = await resolveIdpSettings(sessionData.orgId, this.env, sessionData.authPurpose ?? 'authcode');
+          const idp = await resolveIdpSettings(this.env, sessionData.authPurpose ?? 'authcode');
           if (idp.endpoints.endSessionEndpoint) {
             const logoutUrl = new URL(idp.endpoints.endSessionEndpoint);
             logoutUrl.searchParams.set('client_id', idp.clientId);
@@ -148,12 +110,8 @@ export class AuthRoutesHandler {
     });
   }
 
-  // Shared by /login, /:orgId/login, and /:orgId/console — all three start
-  // the exact same authorization-code flow, differing only in which org and
-  // where the browser lands afterward. `orgIdentifier` may be a real id, or
-  // (for the unprefixed paths) the request's own Host header —
-  // buildOAuthHandler resolves whichever it is and hands back the real id.
-  private async startLogin(orgIdentifier: string, returnTo: string, request: Request): Promise<Response> {
+  // /login[?returnTo=…] — the authorization-code flow.
+  private async startLogin(returnTo: string, request: Request): Promise<Response> {
     if (!(await this.checkRateLimit(request))) {
       return new Response('Te veel aanmeldpogingen. Probeer over een minuut opnieuw.', {
         status: 429,
@@ -161,9 +119,9 @@ export class AuthRoutesHandler {
       });
     }
 
-    const { oauth, idp } = await this.buildOAuthHandler(orgIdentifier);
+    const oauth = await this.buildOAuthHandler();
 
-    const [authUrl, state] = await oauth.login(idp.orgId, returnTo);
+    const [authUrl, state] = await oauth.login(returnTo);
     return new Response(null, {
       status: 302,
       headers: {

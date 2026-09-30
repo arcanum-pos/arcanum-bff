@@ -1,6 +1,6 @@
 import type { OAuthEndpoints, SessionData, DevicePollSessionData } from '../types';
 import type { SessionStore } from './session';
-import { decodeJwtPayload } from './jwt';
+import { decodeJwtPayload, toEmailVerified } from './jwt';
 
 export interface DeviceFlowSettings {
   clientId: string;
@@ -41,11 +41,11 @@ export class DeviceFlowHandler {
     this.issuerUrl = settings.issuerUrl;
     // See auth.ts's identical comment: 'offline_access' is an Auth0-ism
     // Google's device endpoint rejects with invalid_scope. Overridable per
-    // org — see identity_providers.scopes.
+    // instance — see identity_providers.scopes.
     this.scope = settings.scope ?? 'openid profile email offline_access';
   }
 
-  async start(orgId: string): Promise<DeviceStartResult | { error: string }> {
+  async start(): Promise<DeviceStartResult | { error: string }> {
     // Note: unlike /authorize, Auth0's /oauth/device/code endpoint does not support a
     // `connection` param (only client_id, scope, audience are documented) — passing one
     // here caused login failures once a fresh authentication was actually required.
@@ -92,7 +92,7 @@ export class DeviceFlowHandler {
     }
 
     const pollId = await this.sessionStore.create(
-      { deviceCode: data.device_code, type: 'device_poll', orgId } satisfies DevicePollSessionData,
+      { deviceCode: data.device_code, type: 'device_poll' } satisfies DevicePollSessionData,
       data.expires_in
     );
 
@@ -141,8 +141,7 @@ export class DeviceFlowHandler {
       expires_in: number;
     };
 
-    // Confirms the token actually came from the issuer resolved for this
-    // org, before trusting anything else in it — guards against a
+    // Confirms the token actually came from the instance's issuer, before trusting anything else in it — guards against a
     // resolution bug or race silently minting a session against the wrong
     // identity provider.
     if (token.id_token) {
@@ -164,7 +163,7 @@ export class DeviceFlowHandler {
       return [{ status: 'error', message: 'Kon gebruikersinfo niet ophalen' }, null];
     }
 
-    const userInfo = (await userResponse.json()) as { email?: string; name?: string };
+    const userInfo = (await userResponse.json()) as { email?: string; name?: string; email_verified?: unknown };
 
     const sessionData: SessionData = {
       access_token: token.access_token,
@@ -173,7 +172,7 @@ export class DeviceFlowHandler {
       email: userInfo.email ?? '',
       name: userInfo.name ?? '',
       expires_at: Date.now() / 1000 + token.expires_in,
-      orgId: stored.orgId,
+      email_verified: toEmailVerified(userInfo.email_verified),
       issuer: this.issuerUrl,
       authPurpose: 'device',
     };

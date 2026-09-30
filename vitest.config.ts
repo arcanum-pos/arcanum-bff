@@ -25,6 +25,31 @@ function frontends(request: Request) {
 
 const unused = () => Response.json({ error: 'not stubbed' }, { status: 500 });
 
+// Stand-in for arcanum-backend: the instance's login provider on
+// /identity-provider/resolve (with the BFF key only), anything else echoed
+// back — so a test can see which path and identity headers it got.
+const IDP = {
+  issuerUrl: 'https://login.test',
+  connectionName: null,
+  scopes: null,
+  endpoints: {
+    authorization_endpoint: 'https://login.test/authorize',
+    token_endpoint: 'https://login.test/token',
+    userinfo_endpoint: 'https://login.test/userinfo',
+    device_authorization_endpoint: 'https://login.test/device/code',
+    end_session_endpoint: 'https://login.test/logout',
+  },
+};
+async function backend(request: Request) {
+  const url = new URL(request.url);
+  if (url.pathname === '/identity-provider/resolve') {
+    if (request.headers.get('Authorization') !== 'Bearer test-bff-key') return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const purpose = url.searchParams.get('purpose');
+    return Response.json({ ...IDP, clientId: `${purpose}-client`, clientSecret: `${purpose}-secret` });
+  }
+  return Response.json({ echo: true, path: url.pathname, search: url.search, headers: Object.fromEntries(request.headers) });
+}
+
 export default defineConfig({
   plugins: [
     cloudflareTest({
@@ -41,7 +66,7 @@ export default defineConfig({
           INSTALLER_INTERNAL_KEY: 'test-installer-key',
         },
         serviceBindings: {
-          ARCANUM_BACKEND_SERVICE: unused,
+          ARCANUM_BACKEND_SERVICE: backend,
           ARCANUM_DEVICEHUB_SERVICE: unused,
           ARCANUM_FRONTENDS_SERVICE: frontends,
           ARCANUM_INSTALLER_SERVICE: echoInstaller,
