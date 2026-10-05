@@ -1,5 +1,5 @@
 import type { Env, SessionData, OAuthSettings } from '../types';
-import { resolveIdpSettings } from '../types';
+import { resolveIdpSettings } from './idp';
 import type { SessionStore } from './session';
 import { LOGIN_STATE_SECONDS, OAuthHandler } from './auth';
 import { buildSessionCookie, clearSessionCookies, cookieValue, LOGIN_STATE_COOKIE, loginStateCookie, sessionIdFrom } from './cookie';

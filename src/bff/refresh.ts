@@ -1,5 +1,5 @@
 import type { SessionData, Env } from '../types';
-import { resolveIdpSettings } from '../types';
+import { resolveIdpSettings } from './idp';
 import type { SessionStore } from './session';
 
 // Takes SessionData's own `expires_at` (set from the token response's `expires_in`

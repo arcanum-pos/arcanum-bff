@@ -1,5 +1,5 @@
 import type { Env, SessionData } from '../types';
-import { resolveIdpSettings } from '../types';
+import { resolveIdpSettings } from './idp';
 import type { SessionStore } from './session';
 import { DeviceFlowHandler } from './device';
 import { buildSessionCookie } from './cookie';

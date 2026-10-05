@@ -14,7 +14,15 @@ import { UIFrontendProxy } from './services/uiProxy';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const response = await handle(request, env, ctx);
+    let response: Response;
+    try {
+      response = await handle(request, env, ctx);
+    } catch (err) {
+      // Anything unexpected (the login provider unreachable, a backend error):
+      // a plain 502 and a log line, not the runtime's own error page.
+      console.error('Unexpected error', err);
+      response = new Response('Er ging iets mis. Probeer het zo meteen opnieuw.', { status: 502, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    }
     // A WebSocket upgrade (/devices/connect) is passed on untouched.
     if (response.status === 101 || response.webSocket) return response;
     return finish(request, env, response);

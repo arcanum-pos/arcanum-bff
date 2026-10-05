@@ -1,4 +1,3 @@
-import { callWorker } from './services/workerClient';
 
 export interface NormalizedIdentity {
   sub: string;
@@ -56,6 +55,15 @@ export interface Env {
   // INTERNAL_API_KEY (which authorizes its calls to arcanum-devicehub) —
   // a different pairwise relationship, independently rotatable.
   BFF_INTERNAL_KEY: string;
+  // The instance's login provider (bff/idp.ts) — the same values the
+  // installer gives arcanum-backend. Unset: asked from arcanum-backend.
+  DEFAULT_IDP_ISSUER_URL?: string;
+  DEFAULT_IDP_CLIENT_ID?: string;
+  DEFAULT_IDP_CLIENT_SECRET?: string;
+  DEFAULT_IDP_CONNECTION_NAME?: string;
+  DEFAULT_IDP_SCOPES?: string;
+  DEFAULT_IDP_AUTH_CODE_CLIENT_ID?: string;
+  DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET?: string;
   // Local `wrangler dev` HTTP fallbacks (set via .dev.vars only, unused in production
   // where service bindings are used instead)
   BANCONTACT_LOCAL_URL?: string;
@@ -138,10 +146,8 @@ export function isSessionData(data: SessionData | NormalizedIdentity | string): 
 // What arcanum-bff needs to drive a login: the instance's identity provider
 // (arcanum-backend's `default` identity_providers row — one per
 // installation, for every org; see its organizations/identity-providers.ts).
-// No discovery fetch happens here: the backend resolved and persisted the
-// endpoints when it seeded the row, so this is just a service-binding round
-// trip. The browser always comes back to FRONTEND_URL (/callback), whatever
-// hostname it started on.
+// Resolved by bff/idp.ts. The browser always comes back to FRONTEND_URL
+// (/callback), whatever hostname it started on.
 export interface IdpSettings {
   issuerUrl: string;
   clientId: string;
@@ -149,46 +155,4 @@ export interface IdpSettings {
   connectionName?: string;
   scope?: string;
   endpoints: OAuthEndpoints;
-}
-
-// GET /identity-provider/resolve?purpose=… on arcanum-backend (BFF_INTERNAL_KEY).
-// `purpose` picks the OAuth client — 'authcode' for the browser flow
-// (/login), 'device' for the device grant (/device). Some providers (Google)
-// require a separate client per flow; the backend resolves the actual
-// override, this just says which one it wants.
-export async function resolveIdpSettings(env: Env, purpose: 'device' | 'authcode'): Promise<IdpSettings> {
-  const res = await callWorker(env, `/identity-provider/resolve?purpose=${purpose}`);
-  if (!res.ok) {
-    throw new Error(`Failed to resolve the identity provider: ${res.status}`);
-  }
-
-  const data = (await res.json()) as {
-    issuerUrl: string;
-    clientId: string;
-    clientSecret: string;
-    connectionName: string | null;
-    scopes: string | null;
-    endpoints: {
-      authorization_endpoint: string;
-      token_endpoint: string;
-      userinfo_endpoint: string;
-      device_authorization_endpoint: string;
-      end_session_endpoint: string | null;
-    };
-  };
-
-  return {
-    issuerUrl: data.issuerUrl,
-    clientId: data.clientId,
-    clientSecret: data.clientSecret,
-    connectionName: data.connectionName ?? undefined,
-    scope: data.scopes ?? undefined,
-    endpoints: {
-      authEndpoint: data.endpoints.authorization_endpoint,
-      tokenEndpoint: data.endpoints.token_endpoint,
-      userinfoEndpoint: data.endpoints.userinfo_endpoint,
-      deviceCodeEndpoint: data.endpoints.device_authorization_endpoint,
-      endSessionEndpoint: data.endpoints.end_session_endpoint ?? undefined,
-    },
-  };
 }
