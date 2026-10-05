@@ -81,20 +81,18 @@ npx wrangler kv namespace create ARCANUM_SESSIONS
 
 This prints an `id`. Put it into `wrangler.jsonc`'s `kv_namespaces` entry.
 
-### 4. Set the Auth0 domain
-
-In `wrangler.jsonc`, set `vars.AUTH0_DOMAIN` to your tenant's domain (e.g.
-`your-tenant.eu.auth0.com` — no `https://`, no trailing slash).
-
-### 5. Set secrets
+### 4. Set secrets
 
 ```bash
 npx wrangler secret put BFF_INTERNAL_KEY
 ```
 
-`BFF_INTERNAL_KEY` must match the same secret set on `arcanum-backend`.
+`BFF_INTERNAL_KEY` must match the same secret set on `arcanum-backend`. The
+BFF also derives two keys of its own from it (HKDF, `src/bff/crypto.ts`):
+one signs the short-lived values a browser carries during a login, one
+encrypts sessions at rest. Rotating it therefore also ends every session.
 
-### 6. Service bindings — deploy order matters
+### 5. Service bindings — deploy order matters
 
 `wrangler.jsonc`'s three service bindings are by Worker name — each target
 Worker must already be deployed under its exact name before this Worker's
@@ -102,11 +100,35 @@ own deploy will succeed (Wrangler validates bindings at deploy time). Deploy
 `arcanum-backend`, `arcanum-devicehub`, and `arcanum-frontends` first, then
 this Worker last (`wrangler deploy`), which claims `arcanum.kaboutersoft.be`.
 
-### 7. Deploy
+### 6. Deploy
 
 ```bash
 npx wrangler deploy
 ```
+
+## Security notes
+
+- **Sessions**: a 256-bit random id in the `__Host-session_id` cookie
+  (`Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`; plain `session_id` only in
+  local development or with `COOKIE_DOMAIN`). The session itself — access,
+  refresh and id token — is AES-GCM-encrypted in KV. An old `session_id`
+  cookie is still read and moved to the new name.
+- **Login** (`/login` → provider → `/callback`): PKCE S256; the verifier,
+  the `state` and where to land travel in a signed, 10-minute `oauth_state`
+  cookie, so `/callback` only goes on for the browser that started the login
+  (no login CSRF), and nothing is written to KV before a login succeeds.
+- **Device login** (`/device/start`, `/device/poll?id=`): the poll id is the
+  provider's device code, signed; starts are rate-limited per IP.
+- **No bearer tokens**: only the session cookie signs a request in.
+- **Token refresh**: when a parallel request already refreshed, the newer
+  tokens in the session are used instead of signing the browser out.
+- **Forwarding**: identity headers a client sends are always replaced;
+  `/api/bancontact/*` forwards only the payment and ledger paths the screens
+  use; `/api/callback/*` (payment providers) is the one unauthenticated pipe.
+- **Headers** on every answer: `X-Frame-Options: DENY` + CSP
+  `frame-ancestors 'none'`, `nosniff`, `strict-origin-when-cross-origin`,
+  HSTS — never overriding what an upstream set itself.
+- **Logout** refuses a cross-site request (`Sec-Fetch-Site: cross-site`).
 
 ## Local development
 

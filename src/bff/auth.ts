@@ -1,6 +1,20 @@
-import type { OAuthSettings, SessionData, PkceSessionData } from '../types';
-import type { SessionStore } from './session';
+import type { Env, OAuthSettings, SessionData } from '../types';
 import { decodeJwtPayload, toEmailVerified } from './jwt';
+import { randomToken, signValue, timingSafeEqual, verifyValue } from './crypto';
+
+// How long a login may take at the provider (the state cookie's life).
+export const LOGIN_STATE_SECONDS = 600;
+
+// What the login's state cookie carries (signed, bff/crypto.ts): the
+// `state` sent to the provider, the PKCE verifier, and where to land.
+// Nothing is stored server-side until the login succeeds — so /login costs
+// no KV write — and /callback only goes on for the browser that started
+// the login (its cookie must name that `state`): no login CSRF.
+interface LoginState extends Record<string, unknown> {
+  s: string;
+  v: string;
+  r: string;
+}
 
 export class OAuthHandler {
   private clientId: string;
@@ -13,7 +27,7 @@ export class OAuthHandler {
   private issuerUrl: string;
   private scope: string;
 
-  constructor(private sessionStore: SessionStore, settings: OAuthSettings) {
+  constructor(private env: Env, settings: OAuthSettings) {
     this.clientId = settings.OAUTH_CLIENT_ID;
     this.clientSecret = settings.OAUTH_CLIENT_SECRET;
     this.redirectUri = settings.REDIRECT_URI;
@@ -29,14 +43,12 @@ export class OAuthHandler {
     this.scope = settings.scope ?? 'openid profile email offline_access';
   }
 
-  async login(returnTo?: string): Promise<[string, string]> {
+  // [the provider's authorize URL, the signed state cookie's value]
+  async login(returnTo = ''): Promise<[string, string]> {
     const codeVerifier = this._generateCodeVerifier();
     const codeChallenge = await this._generateCodeChallenge(codeVerifier);
-
-    const tempSessionId = await this.sessionStore.create(
-      { codeVerifier, type: 'oauth_pkce', returnTo } satisfies PkceSessionData,
-      600
-    );
+    const state = randomToken(32);
+    const cookie = await signValue(this.env, 'login', { s: state, v: codeVerifier, r: returnTo } satisfies LoginState, LOGIN_STATE_SECONDS);
 
     const params = new URLSearchParams({
       client_id: this.clientId,
@@ -45,7 +57,7 @@ export class OAuthHandler {
       scope: this.scope,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
-      state: tempSessionId,
+      state,
     });
 
     if (this.connection) {
@@ -53,26 +65,30 @@ export class OAuthHandler {
     }
 
     const authUrl = `${this.authEndpoint}?${params.toString()}`;
-    return [authUrl, tempSessionId];
+    return [authUrl, cookie];
   }
 
-  async callback(code: string, state: string): Promise<[SessionData | null, string | null]> {
-    try {
-      const decodedCode = decodeURIComponent(code);
+  // Where the login started wants to land (the state cookie's, '' if none).
+  static async returnTo(env: Env, stateCookie: string | null): Promise<string> {
+    const data = await verifyValue<LoginState>(env, 'login', stateCookie);
+    return data?.r ?? '';
+  }
 
-      const tempData = (await this.sessionStore.get(state)) as PkceSessionData | null;
-      if (!tempData || tempData.type !== 'oauth_pkce') {
+  // `stateCookie`: this browser's login state cookie — it must be for this very `state`.
+  async callback(code: string, state: string, stateCookie: string | null): Promise<[SessionData | null, string | null]> {
+    try {
+      const login = await verifyValue<LoginState>(this.env, 'login', stateCookie);
+      if (!login || !state || !timingSafeEqual(login.s, state)) {
         return [null, 'Invalid or expired state'];
       }
-
-      const { codeVerifier } = tempData;
+      const codeVerifier = login.v;
 
       const tokenResponse = await fetch(this.tokenEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           grant_type: 'authorization_code',
-          code: decodedCode,
+          code,
           client_id: this.clientId,
           client_secret: this.clientSecret,
           redirect_uri: this.redirectUri,
@@ -127,8 +143,6 @@ export class OAuthHandler {
         issuer: this.issuerUrl,
         authPurpose: 'authcode',
       };
-
-      await this.sessionStore.delete(state);
 
       return [sessionData, null];
     } catch (error) {

@@ -1,24 +1,26 @@
 import { SessionStore } from '../bff/session';
+import { openSession, sealSession } from '../bff/crypto';
+import type { Env } from '../types';
 
+// Sessions in KV, encrypted at rest (bff/crypto.ts): whoever can read the
+// namespace (a Cloudflare API token with KV access) sees no access or
+// refresh tokens. A session written before encryption is still read.
 export class CloudflareKVSessionStore extends SessionStore {
-  constructor(private kv: KVNamespace) {
+  constructor(private kv: KVNamespace, private env: Env) {
     super();
   }
 
   async get(sessionId: string): Promise<unknown | null> {
     const raw = await this.kv.get(sessionId);
     if (raw === null) return null;
-
-    try {
-      return JSON.parse(raw);
-    } catch (e) {
-      console.error(`JSON parse error for session ${sessionId}:`, e);
-      return null;
-    }
+    const data = await openSession(this.env, sessionId, raw);
+    // Never the id itself in the log: it's a credential while the session lasts.
+    if (data === null) console.error('A session in KV could not be read (corrupt, or sealed with another key)');
+    return data;
   }
 
   async set(sessionId: string, data: unknown, ttlSeconds = 604800): Promise<void> {
-    await this.kv.put(sessionId, JSON.stringify(data), { expirationTtl: ttlSeconds });
+    await this.kv.put(sessionId, await sealSession(this.env, sessionId, data), { expirationTtl: ttlSeconds });
   }
 
   async delete(sessionId: string): Promise<void> {

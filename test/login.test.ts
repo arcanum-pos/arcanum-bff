@@ -43,19 +43,26 @@ function mockProvider(claims: Record<string, unknown>, userinfo: Record<string, 
 }
 afterEach(() => vi.restoreAllMocks());
 
+// The browser's login state cookie from the last /login (sent back to /callback).
+let stateCookie = '';
 async function startLogin(url: string) {
   const res = await call(url);
   expect(res.status).toBe(302);
+  stateCookie = res.headers.getSetCookie().find((c) => c.startsWith('oauth_state='))!.split(';')[0];
   return new URL(res.headers.get('Location')!);
 }
+
+const sessionCookieOf = (res: Response) => res.headers.getSetCookie().find((c) => /^(__Host-)?session_id=[^;]/.test(c))!.split(';')[0];
+const callback = (state: string | null, cookie: string | null = stateCookie) =>
+  call(`${BASE}/callback?code=c&state=${state}`, cookie ? { headers: { Cookie: cookie } } : {});
 
 // A full browser login; returns the session cookie.
 async function logIn(claims: Record<string, unknown>, userinfo?: Record<string, unknown>) {
   mockProvider(claims, userinfo);
   const authorize = await startLogin(`${BASE}/login?returnTo=/console`);
-  const res = await call(`${BASE}/callback?code=c&state=${authorize.searchParams.get('state')}`);
+  const res = await callback(authorize.searchParams.get('state'));
   expect(res.status).toBe(302);
-  return res.headers.get('Set-Cookie')!.split(';')[0];
+  return sessionCookieOf(res);
 }
 
 async function forwardedHeaders(cookie: string): Promise<Record<string, string>> {
@@ -78,10 +85,10 @@ describe('/login', () => {
   it('comes back on FRONTEND_URL at returnTo, with a session', async () => {
     mockProvider({ sub: 'u1', email: 'ann@example.test' });
     const authorize = await startLogin('https://pos.some-org.test/login?returnTo=/console');
-    const res = await call(`${BASE}/callback?code=c&state=${authorize.searchParams.get('state')}`);
+    const res = await callback(authorize.searchParams.get('state'));
     expect(res.status).toBe(302);
     expect(res.headers.get('Location')).toBe(`${BASE}/console`);
-    expect(res.headers.get('Set-Cookie')).toMatch(/^session_id=/);
+    expect(sessionCookieOf(res)).toMatch(/^__Host-session_id=[0-9a-f]{64}$/);
   });
 
   it('the per-org login paths are gone', async () => {

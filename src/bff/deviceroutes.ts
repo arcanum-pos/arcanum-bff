@@ -19,7 +19,7 @@ export class DeviceRoutesHandler {
   // device-grant client).
   private async buildDeviceHandler(): Promise<DeviceFlowHandler> {
     const idp = await resolveIdpSettings(this.env, 'device');
-    return new DeviceFlowHandler(this.sessionStore, {
+    return new DeviceFlowHandler(this.env, {
       clientId: idp.clientId,
       clientSecret: idp.clientSecret,
       endpoints: idp.endpoints,
@@ -43,6 +43,13 @@ export class DeviceRoutesHandler {
     }
 
     if (path === '/device/start' && request.method === 'POST') {
+      // Each start asks the login provider for a device code: per IP, at
+      // most what a kiosk ever needs (the login limiter, its own key).
+      if (this.env.LOGIN_RATE_LIMITER) {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        const { success } = await this.env.LOGIN_RATE_LIMITER.limit({ key: `device-start:${ip}` });
+        if (!success) return json({ error: 'Te veel aanvragen. Probeer over een minuut opnieuw.' }, 429);
+      }
       const device = await this.buildDeviceHandler();
       const result = await device.start();
       if ('error' in result) return json(result, 502);

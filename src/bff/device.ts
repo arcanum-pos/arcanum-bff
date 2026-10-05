@@ -1,6 +1,12 @@
-import type { OAuthEndpoints, SessionData, DevicePollSessionData } from '../types';
-import type { SessionStore } from './session';
+import type { Env, OAuthEndpoints, SessionData } from '../types';
 import { decodeJwtPayload, toEmailVerified } from './jwt';
+import { signValue, verifyValue } from './crypto';
+
+// The poll id the device page gets is the provider's device_code itself,
+// signed (bff/crypto.ts) and expiring with it — nothing stored server-side,
+// so starting a device login costs no KV write. It's as secret as the KV
+// key it replaces: whoever holds it collects the session once approved.
+// The provider's device_code works once, so the id does too.
 
 export interface DeviceFlowSettings {
   clientId: string;
@@ -32,7 +38,7 @@ export class DeviceFlowHandler {
   private issuerUrl: string;
   private scope: string;
 
-  constructor(private sessionStore: SessionStore, settings: DeviceFlowSettings) {
+  constructor(private env: Env, settings: DeviceFlowSettings) {
     this.clientId = settings.clientId;
     this.clientSecret = settings.clientSecret;
     this.deviceCodeEndpoint = settings.endpoints.deviceCodeEndpoint;
@@ -91,10 +97,7 @@ export class DeviceFlowHandler {
       return { error: 'Kon apparaatcode niet aanmaken' };
     }
 
-    const pollId = await this.sessionStore.create(
-      { deviceCode: data.device_code, type: 'device_poll' } satisfies DevicePollSessionData,
-      data.expires_in
-    );
+    const pollId = await signValue(this.env, 'device-poll', { dc: data.device_code }, Math.min(Math.max(Number(data.expires_in) || 600, 60), 3600));
 
     return {
       pollId,
@@ -106,8 +109,8 @@ export class DeviceFlowHandler {
   }
 
   async poll(pollId: string): Promise<[DevicePollResult, SessionData | null]> {
-    const stored = (await this.sessionStore.get(pollId)) as DevicePollSessionData | null;
-    if (!stored || stored.type !== 'device_poll') {
+    const stored = await verifyValue<{ dc: string }>(this.env, 'device-poll', pollId);
+    if (!stored || typeof stored.dc !== 'string') {
       return [{ status: 'error', message: 'Onbekende of verlopen aanvraag' }, null];
     }
 
@@ -116,7 +119,7 @@ export class DeviceFlowHandler {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        device_code: stored.deviceCode,
+        device_code: stored.dc,
         client_id: this.clientId,
         client_secret: this.clientSecret,
       }),
@@ -130,7 +133,6 @@ export class DeviceFlowHandler {
       if (data.error === 'slow_down') {
         return [{ status: 'pending', interval: 5 }, null];
       }
-      await this.sessionStore.delete(pollId);
       return [{ status: 'error', message: data.error ?? 'Aanmelden mislukt of geweigerd' }, null];
     }
 
@@ -148,7 +150,6 @@ export class DeviceFlowHandler {
       const payload = decodeJwtPayload(token.id_token);
       if (!payload || payload.iss !== this.issuerUrl) {
         console.error(`Issuer mismatch: expected ${this.issuerUrl}, got ${payload?.iss}`);
-        await this.sessionStore.delete(pollId);
         return [{ status: 'error', message: 'Issuer mismatch' }, null];
       }
     }
@@ -156,8 +157,6 @@ export class DeviceFlowHandler {
     const userResponse = await fetch(this.userinfoEndpoint, {
       headers: { Authorization: `Bearer ${token.access_token}` },
     });
-
-    await this.sessionStore.delete(pollId);
 
     if (!userResponse.ok) {
       return [{ status: 'error', message: 'Kon gebruikersinfo niet ophalen' }, null];

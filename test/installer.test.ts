@@ -129,10 +129,10 @@ describe('with the installer', () => {
     expect(echo.headers['x-user-roles']).toBeUndefined();
   });
 
-  it('passes the installer response through unchanged', async () => {
+  it('passes the installer response through — adding only the security headers it lacks', async () => {
     const res = await SELF.fetch(`${BASE}/installer/api/status`, { headers: { Cookie: await signIn() } });
     expect(res.status).toBe(299);
-    expect(res.headers.get('Content-Security-Policy')).toBe("default-src 'none'");
+    expect(res.headers.get('Content-Security-Policy')).toBe("default-src 'none'; frame-ancestors 'none'");
     expect(res.headers.get('Content-Type')).toContain('application/json');
     expect(res.headers.get('X-Installer')).toBe('echo');
   });

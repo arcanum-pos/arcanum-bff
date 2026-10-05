@@ -3,18 +3,10 @@ import { isSessionData } from '../types';
 import type { SessionStore } from './session';
 import { isTokenExpiringSoon, refreshUserToken } from './refresh';
 import { decodeJwtPayload, toEmailVerified } from './jwt';
+import { sessionIdFrom } from './cookie';
 
 export async function authresult(request: Request, env: Env, sessionStore: SessionStore): Promise<AuthResult> {
-  const bearerToken = extractBearerToken(request);
-  const sessionId = extractSessionId(request);
-
-  if (bearerToken) {
-    const identity = await validateAuth0Bearer(bearerToken, env);
-    if (!identity) {
-      return { type: 'machine', data: 'token invalid', token: '', authMethod: 'bearer' };
-    }
-    return { type: 'machine', data: identity, token: bearerToken, authMethod: 'bearer', identity };
-  }
+  const sessionId = sessionIdFrom(request, env);
 
   if (sessionId) {
     let sessionData = await getSessionData(sessionStore, sessionId);
@@ -22,11 +14,15 @@ export async function authresult(request: Request, env: Env, sessionStore: Sessi
     if (validateSessionData(sessionData)) {
       if (isTokenExpiringSoon(sessionData.expires_at, 30)) {
         const refreshed = await refreshUserToken(sessionData, sessionId, sessionStore, env);
-        if (refreshed) {
-          sessionData = await getSessionData(sessionStore, sessionId);
-        } else {
+        // Refused, or failed: maybe another request of this browser just
+        // refreshed it (the kassa fires several at once) — then the session
+        // in KV already holds the new tokens.
+        const latest = await getSessionData(sessionStore, sessionId);
+        const refreshedElsewhere = validateSessionData(latest) && latest.access_token !== sessionData.access_token && !isTokenExpiringSoon(latest.expires_at, 0);
+        if (!refreshed && !refreshedElsewhere) {
           return { type: 'user', data: 'token refresh failed', token: '', authMethod: 'public' };
         }
+        sessionData = latest;
       }
 
       if (validateSessionData(sessionData)) {
@@ -43,35 +39,6 @@ export async function authresult(request: Request, env: Env, sessionStore: Sessi
   }
 
   return { type: 'user', data: '', token: '', authMethod: 'public' };
-}
-
-// Deliberately still scoped to the platform's one original Auth0 tenant
-// only — the Bearer-token auth path, not the cookie-session path. No
-// current caller presents a bearer token from an org-specific issuer; if
-// that ever changes, this needs the same per-issuer resolution the
-// session/device/login paths already have.
-async function validateAuth0Bearer(token: string, env: Env): Promise<NormalizedIdentity | null> {
-  try {
-    const response = await fetch(`https://${env.AUTH0_DOMAIN}/userinfo`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) return null;
-
-    const userInfo = (await response.json()) as Record<string, unknown>;
-    return {
-      sub: (userInfo.sub as string) ?? '',
-      email: (userInfo.email as string) ?? '',
-      name: (userInfo.name as string) ?? '',
-      firstName: (userInfo.given_name as string) ?? '',
-      lastName: (userInfo.family_name as string) ?? '',
-      username: (userInfo.nickname as string) ?? (userInfo.email as string) ?? '',
-      roles: [],
-      issuer: `https://${env.AUTH0_DOMAIN}/`,
-      emailVerified: toEmailVerified(userInfo.email_verified),
-    };
-  } catch {
-    return null;
-  }
 }
 
 // `roles` is always empty here: we never request an API-scoped access token
@@ -102,15 +69,6 @@ function extractIdentityFromSession(sessionData: SessionData): NormalizedIdentit
   };
 }
 
-function extractSessionId(request: Request): string | null {
-  const cookieHeader = request.headers.get('Cookie') ?? '';
-  for (const cookie of cookieHeader.split(';')) {
-    const [name, value] = cookie.trim().split('=');
-    if (name === 'session_id') return value ?? null;
-  }
-  return null;
-}
-
 async function getSessionData(sessionStore: SessionStore, sessionId: string): Promise<SessionData | null> {
   const data = await sessionStore.get(sessionId);
   if (!data || typeof data !== 'object') return null;
@@ -131,11 +89,4 @@ function validateSessionData(data: SessionData | null): data is SessionData {
     return false;
   }
   return true;
-}
-
-function extractBearerToken(request: Request): string | null {
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader) return null;
-  const [scheme, token] = authHeader.split(' ');
-  return scheme === 'Bearer' && token ? token : null;
 }

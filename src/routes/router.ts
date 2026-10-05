@@ -12,8 +12,11 @@ interface RouteDefinition {
 }
 
 const ROUTES: RouteDefinition[] = [
+  // Only the payment and ledger paths the screens use — not the whole
+  // backend under a stripped prefix (its internal routes have their own keys,
+  // but nothing here should depend on that).
   {
-    pattern: /^\/api\/bancontact(\/|$)/,
+    pattern: /^\/api\/bancontact\/(payments|transactions|sumup\/(charge|confirm|readers|status\/[^/]+))$/,
     service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: true,
     rewritePath: { from: '/api/bancontact', to: '' },

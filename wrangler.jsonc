@@ -52,7 +52,6 @@
 	"upload_source_maps": true,
 	"vars": {
 		// Replace with your new Auth0 tenant's domain, e.g. "your-tenant.eu.auth0.com".
-		"AUTH0_DOMAIN": "auth.esvvzw.be",
 		"SESSION_TTL": 604800,
 		"FRONTEND_URL": "https://arcanum.kaboutersoft.be"
 		// No AUDIENCE var: we deliberately don't request an Auth0-API-scoped access token.

@@ -1,8 +1,8 @@
-import type { Env, SessionData, PkceSessionData, OAuthSettings } from '../types';
+import type { Env, SessionData, OAuthSettings } from '../types';
 import { resolveIdpSettings } from '../types';
 import type { SessionStore } from './session';
-import { OAuthHandler } from './auth';
-import { buildSessionCookie } from './cookie';
+import { LOGIN_STATE_SECONDS, OAuthHandler } from './auth';
+import { buildSessionCookie, clearSessionCookies, cookieValue, LOGIN_STATE_COOKIE, loginStateCookie, sessionIdFrom } from './cookie';
 
 export class AuthRoutesHandler {
   constructor(private sessionStore: SessionStore, private env: Env) {}
@@ -27,14 +27,7 @@ export class AuthRoutesHandler {
       scope: idp.scope,
       endpoints: idp.endpoints,
     };
-    return new OAuthHandler(this.sessionStore, settings);
-  }
-
-  // Where to land after /callback — stored in the PKCE session `state`
-  // refers to at /login time; peeked here before oauth.callback() deletes it.
-  private async peekReturnTo(state: string): Promise<string> {
-    const data = (await this.sessionStore.get(state)) as PkceSessionData | null;
-    return sanitizeReturnTo(data?.returnTo);
+    return new OAuthHandler(this.env, settings);
   }
 
   async processAuthRoute(request: Request): Promise<Response> {
@@ -46,32 +39,42 @@ export class AuthRoutesHandler {
     }
 
     if (path === '/callback') {
-      const params = Object.fromEntries(url.searchParams.entries());
-      const returnTo = await this.peekReturnTo(params.state ?? '');
+      // The state cookie is used once, whatever happens.
+      const headers = new Headers({ 'Set-Cookie': loginStateCookie(this.env, '', 0) });
+      const stateCookie = cookieValue(request, LOGIN_STATE_COOKIE);
       const oauth = await this.buildOAuthHandler();
-      const [userSessionData, error] = await oauth.callback(params.code ?? '', params.state ?? '');
+      const [userSessionData, error] = await oauth.callback(url.searchParams.get('code') ?? '', url.searchParams.get('state') ?? '', stateCookie);
 
       if (error || !userSessionData) {
-        return new Response(JSON.stringify({ error: error ?? 'Unknown error' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        headers.set('Content-Type', 'application/json');
+        return new Response(JSON.stringify({ error: error ?? 'Unknown error' }), { status: 400, headers });
       }
 
+      const returnTo = sanitizeReturnTo(await OAuthHandler.returnTo(this.env, stateCookie));
       const newSessionId = await this.sessionStore.create(userSessionData satisfies SessionData, this.env.SESSION_TTL);
-      const cookieHeaders = { 'Set-Cookie': buildSessionCookie(this.env, newSessionId) };
-
-      return new Response(null, { status: 302, headers: { Location: `${this.env.FRONTEND_URL}${returnTo}`, ...cookieHeaders } });
+      headers.append('Set-Cookie', buildSessionCookie(this.env, newSessionId));
+      headers.set('Location', `${this.env.FRONTEND_URL}${returnTo}`);
+      return new Response(null, { status: 302, headers });
     }
 
     if (path === '/logout') {
-      const sessionId = extractSessionId(request);
+      // A link on another site can't sign anyone out (SameSite=Lax still
+      // sends the cookie on a top-level navigation): only our own pages, or
+      // the address typed or bookmarked.
+      if (request.headers.get('Sec-Fetch-Site') === 'cross-site') {
+        return new Response(null, { status: 302, headers: { Location: this.env.FRONTEND_URL } });
+      }
+      const sessionId = sessionIdFrom(request, this.env);
       const sessionData = sessionId ? ((await this.sessionStore.get(sessionId)) as SessionData | null) : null;
       if (sessionId) {
         await this.sessionStore.delete(sessionId);
       }
 
-      const clearCookieHeaders = { 'Set-Cookie': 'session_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' };
+      const clearCookieHeaders = () => {
+        const headers = new Headers();
+        for (const cookie of clearSessionCookies(this.env)) headers.append('Set-Cookie', cookie);
+        return headers;
+      };
 
       // Clearing our own session isn't enough — the identity provider may
       // keep its own SSO session cookie, so without an upstream logout call
@@ -94,14 +97,18 @@ export class AuthRoutesHandler {
             logoutUrl.searchParams.set('post_logout_redirect_uri', this.env.FRONTEND_URL);
             logoutUrl.searchParams.set('returnTo', this.env.FRONTEND_URL);
             if (sessionData.id_token) logoutUrl.searchParams.set('id_token_hint', sessionData.id_token);
-            return new Response(null, { status: 302, headers: { Location: logoutUrl.toString(), ...clearCookieHeaders } });
+            const headers = clearCookieHeaders();
+            headers.set('Location', logoutUrl.toString());
+            return new Response(null, { status: 302, headers });
           }
         } catch (err) {
           console.error('Kon identity provider niet ophalen voor logout, val terug op lokaal uitloggen', err);
         }
       }
 
-      return new Response(null, { status: 302, headers: { Location: this.env.FRONTEND_URL, ...clearCookieHeaders } });
+      const headers = clearCookieHeaders();
+      headers.set('Location', this.env.FRONTEND_URL);
+      return new Response(null, { status: 302, headers });
     }
 
     return new Response(JSON.stringify({ error: 'Not found' }), {
@@ -121,13 +128,10 @@ export class AuthRoutesHandler {
 
     const oauth = await this.buildOAuthHandler();
 
-    const [authUrl, state] = await oauth.login(returnTo);
+    const [authUrl, stateCookie] = await oauth.login(returnTo);
     return new Response(null, {
       status: 302,
-      headers: {
-        Location: authUrl,
-        'Set-Cookie': `oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`,
-      },
+      headers: { Location: authUrl, 'Set-Cookie': loginStateCookie(this.env, stateCookie, LOGIN_STATE_SECONDS) },
     });
   }
 
@@ -138,15 +142,6 @@ export class AuthRoutesHandler {
     return success;
   }
 
-}
-
-function extractSessionId(request: Request): string | null {
-  const cookieHeader = request.headers.get('Cookie') ?? '';
-  for (const cookie of cookieHeader.split(';')) {
-    const [name, value] = cookie.trim().split('=');
-    if (name === 'session_id') return value ?? null;
-  }
-  return null;
 }
 
 // /login?returnTo=... is a public, unauthenticated GET — this is the one

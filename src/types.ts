@@ -40,11 +40,6 @@ export interface Env {
   // the installer that the identity headers come from this BFF.
   ARCANUM_INSTALLER_SERVICE?: Fetcher;
   INSTALLER_INTERNAL_KEY?: string;
-  // Still used by authresult.ts's Bearer-token auth path (validateAuth0Bearer)
-  // — deliberately scoped to the platform's one original tenant only, not
-  // yet multi-issuer-aware. Everything else (login, device, refresh,
-  // logout) now resolves via resolveIdpSettings instead.
-  AUTH0_DOMAIN: string;
   SESSION_TTL: number;
   // No OAUTH_CLIENT_ID/SECRET here anymore: every login flow gets its client
   // credentials from arcanum-backend's resolved identity provider.
@@ -104,21 +99,6 @@ export interface SessionData {
   authPurpose: 'device' | 'authcode';
 }
 
-export interface PkceSessionData {
-  codeVerifier: string;
-  type: 'oauth_pkce';
-  // Where to send the browser after a successful callback — defaults to
-  // FRONTEND_URL (the root chooser) when unset. Sanitized before being
-  // stored (see authroutes.ts's sanitizeReturnTo) so a crafted /login?
-  // returnTo= can't turn this into an open redirect.
-  returnTo?: string;
-}
-
-export interface DevicePollSessionData {
-  deviceCode: string;
-  type: 'device_poll';
-}
-
 export interface OAuthEndpoints {
   authEndpoint: string;
   tokenEndpoint: string;
@@ -140,11 +120,14 @@ export interface OAuthSettings {
 
 export type RewritePath = string | { from: string; to: string } | null;
 
+// Who a request is: a browser session, or nobody ('public'). There is no
+// bearer-token way in — it accepted any token the login provider's
+// /userinfo took, also one issued to another installation's client.
 export interface AuthResult {
-  type: 'machine' | 'user';
+  type: 'user';
   data: SessionData | NormalizedIdentity | string;
   token: string;
-  authMethod: 'bearer' | 'session' | 'public';
+  authMethod: 'session' | 'public';
   identity?: NormalizedIdentity;
 }
 

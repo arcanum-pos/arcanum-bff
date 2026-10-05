@@ -6,13 +6,53 @@ import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
 import { forwardToInstaller, installerAvailable, isInstallerPath } from './bff/installer';
 import { Router, isKnownApiRoute, routeRequiresAuth } from './routes/router';
+import { buildSessionCookie, cookieValue, isDevelopment, LEGACY_SESSION_COOKIE, sessionCookieName } from './bff/cookie';
 
 // See LICENSE (AGPL-3.0-or-later) and the /version route below.
 const DEFAULT_SOURCE_URL = 'https://github.com/arcanum-pos';
 import { UIFrontendProxy } from './services/uiProxy';
 
 export default {
-  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const response = await handle(request, env, ctx);
+    // A WebSocket upgrade (/devices/connect) is passed on untouched.
+    if (response.status === 101 || response.webSocket) return response;
+    return finish(request, env, response);
+  },
+};
+
+// Security headers on everything this BFF answers (without overriding what
+// an upstream set itself, like the installer's own CSP), and the session
+// cookie moved to its current name (bff/cookie.ts) for a browser that
+// still has the old one — same session, nobody signed out.
+function finish(request: Request, env: Env, upstream: Response): Response {
+  const response = new Response(upstream.body, upstream);
+  const h = response.headers;
+  const setIfAbsent = (name: string, value: string) => {
+    if (!h.has(name)) h.set(name, value);
+  };
+  setIfAbsent('X-Content-Type-Options', 'nosniff');
+  setIfAbsent('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // No screen is ever meant to be shown inside another site's frame (clickjacking).
+  setIfAbsent('X-Frame-Options', 'DENY');
+  const csp = h.get('Content-Security-Policy');
+  if (!csp) h.set('Content-Security-Policy', "frame-ancestors 'none'");
+  else if (!/frame-ancestors/.test(csp)) h.set('Content-Security-Policy', `${csp}; frame-ancestors 'none'`);
+  if (!isDevelopment(env)) setIfAbsent('Strict-Transport-Security', 'max-age=31536000');
+
+  const current = sessionCookieName(env);
+  if (current !== LEGACY_SESSION_COOKIE) {
+    const legacy = cookieValue(request, LEGACY_SESSION_COOKIE);
+    const setsSession = (h.get('Set-Cookie') ?? '').includes('session_id=');
+    if (legacy && !cookieValue(request, current) && !setsSession && /^[0-9a-f]{64}$/.test(legacy)) {
+      h.append('Set-Cookie', buildSessionCookie(env, legacy));
+      h.append('Set-Cookie', `${LEGACY_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`);
+    }
+  }
+  return response;
+}
+
+async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return corsResponse(new Response(null, { status: 204 }), request, env);
     }
@@ -63,7 +103,7 @@ export default {
       if (path === '/installer') return Response.redirect(new URL(`/installer/${url.search}`, url).toString(), 302);
     }
 
-    const sessionStore = new CloudflareKVSessionStore(env.ARCANUM_SESSIONS);
+    const sessionStore = new CloudflareKVSessionStore(env.ARCANUM_SESSIONS, env);
 
     // Login against the instance's identity provider (one per installation,
     // for every org — hosting plan phase 6 removed the per-org variants
@@ -212,8 +252,7 @@ export default {
     }
 
     return new Response(null, { status: 404 });
-  },
-};
+}
 
 function resolveAllowedOrigin(request: Request, env: Env): string {
   const requestOrigin = request.headers.get('Origin');
