@@ -10,6 +10,9 @@ const OWN = {
   DEFAULT_IDP_ISSUER_URL: 'https://own-idp.test',
   DEFAULT_IDP_CLIENT_ID: 'own-device-client',
   DEFAULT_IDP_CLIENT_SECRET: 'own-device-secret',
+  // No separate browser client unless a test sets one.
+  DEFAULT_IDP_AUTH_CODE_CLIENT_ID: '',
+  DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET: '',
 };
 
 function call(path: string, overrides: Record<string, string> = {}, init?: RequestInit): Promise<Response> {
@@ -87,10 +90,10 @@ describe("the login provider from the bff's own settings", () => {
     expect(down.status).toBe(502);
   });
 
-  it('without them, the backend is asked as before', async () => {
+  it('without them nobody can sign in — the backend is never asked for the client secret', async () => {
     const backend = vi.spyOn(env.ARCANUM_BACKEND_SERVICE, 'fetch');
-    const res = await call('/login');
-    expect(new URL(res.headers.get('Location')!).searchParams.get('client_id')).toBe('authcode-client');
-    expect(backend).toHaveBeenCalled();
+    const res = await call('/login', { DEFAULT_IDP_ISSUER_URL: '', DEFAULT_IDP_CLIENT_ID: '', DEFAULT_IDP_CLIENT_SECRET: '' });
+    expect(res.status).toBe(502);
+    expect(backend).not.toHaveBeenCalled();
   });
 });

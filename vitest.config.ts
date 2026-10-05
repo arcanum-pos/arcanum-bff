@@ -63,8 +63,20 @@ export default defineConfig({
           DEVICEHUB_LOCAL_URL: '',
           BANCONTACT_LOCAL_URL: '',
           BFF_INTERNAL_KEY: 'test-bff-key',
+          // The instance's login provider (bff/idp.ts): the kassa's client,
+          // and a separate browser client (as for Google).
+          DEFAULT_IDP_ISSUER_URL: 'https://login.test',
+          DEFAULT_IDP_CLIENT_ID: 'device-client',
+          DEFAULT_IDP_CLIENT_SECRET: 'device-secret',
+          DEFAULT_IDP_AUTH_CODE_CLIENT_ID: 'authcode-client',
+          DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET: 'authcode-secret',
           INSTALLER_INTERNAL_KEY: 'test-installer-key',
         },
+        // The provider's discovery document (bff/idp.ts fetches it); nothing else leaves.
+        outboundService: (request: Request) =>
+          new URL(request.url).href === 'https://login.test/.well-known/openid-configuration'
+            ? Response.json({ issuer: IDP.issuerUrl, ...IDP.endpoints })
+            : new Response('no outbound in tests', { status: 502 }),
         serviceBindings: {
           ARCANUM_BACKEND_SERVICE: backend,
           ARCANUM_DEVICEHUB_SERVICE: unused,

@@ -47,7 +47,7 @@ export class ServiceProxy {
         return this.errorResponse('Unauthorized', 401);
       }
 
-      const forwardedRequest = this.createForwardedRequest(request, token, options);
+      const forwardedRequest = this.createForwardedRequest(request, options);
       const response = await service.fetch(forwardedRequest);
       return this.forwardResponse(response, options);
     } catch (error) {
@@ -72,7 +72,10 @@ export class ServiceProxy {
       const fullUrl = `${options.local_url}${targetPath}${originalUrl.search}`;
 
       const headers = new Headers(request.headers);
-      if (token) headers.set('Authorization', `Bearer ${token}`);
+      // Neither the user's access token nor anything a client put in
+      // Authorization: the Workers behind work with the identity headers, and
+      // their internal routes take their own keys.
+      headers.delete('Authorization');
       headers.delete('Cookie');
       headers.set('X-Forwarded-By', 'bff-http');
       headers.set('X-Request-ID', crypto.randomUUID());
@@ -93,9 +96,10 @@ export class ServiceProxy {
     }
   }
 
-  private createForwardedRequest(request: Request, token: string | null, options: ForwardOptions): Request {
+  private createForwardedRequest(request: Request, options: ForwardOptions): Request {
     const newHeaders = new Headers(request.headers);
-    if (token) newHeaders.set('Authorization', `Bearer ${token}`);
+    // See forwardViaHttp: no access token, nothing a client put in Authorization.
+    newHeaders.delete('Authorization');
     newHeaders.delete('Cookie');
     newHeaders.set('X-Forwarded-By', 'bff');
     newHeaders.set('X-Request-ID', crypto.randomUUID());

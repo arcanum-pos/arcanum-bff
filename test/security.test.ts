@@ -226,3 +226,63 @@ describe('logout', () => {
     expect(own.headers.getSetCookie().filter((c) => /Max-Age=0/.test(c)).map((c) => c.split('=')[0]).sort()).toEqual(['__Host-session_id', 'session_id']);
   });
 });
+
+describe('writes only from this very site (same-site CSRF)', () => {
+  const post = (path: string, headers: Record<string, string>, url = BASE) =>
+    call(`${url}${path}`, { method: 'POST', headers: { 'Content-Type': 'text/plain', ...headers }, body: '{"name":"x"}' });
+
+  it('refuses a write from a sibling subdomain (same site, other origin) — to the API and to the installer', async () => {
+    const cookie = `__Host-session_id=${await storeSession()}`;
+    for (const headers of [{ Origin: 'https://www.arcanum.test' }, { 'Sec-Fetch-Site': 'same-site' }, { 'Sec-Fetch-Site': 'cross-site' }] as Record<string, string>[]) {
+      expect((await post('/api/organizations/org-1/members', { Cookie: cookie, ...headers })).status, JSON.stringify(headers)).toBe(403);
+      expect((await post('/installer/api/step', { Cookie: cookie, ...headers })).status, JSON.stringify(headers)).toBe(403);
+    }
+  });
+
+  it('lets this site write — on FRONTEND_URL or the address the browser is on (workers.dev) — and reads from anywhere', async () => {
+    const cookie = `__Host-session_id=${await storeSession()}`;
+    const own = await post('/api/organizations/org-1/members', { Cookie: cookie, Origin: BASE, 'Sec-Fetch-Site': 'same-origin' });
+    expect(((await own.json()) as { path: string }).path).toBe('/organizations/org-1/members');
+    const workersDev = 'https://arcanum-bff.someone.workers.dev';
+    expect((await post('/api/organizations/org-1/members', { Cookie: cookie, Origin: workersDev }, workersDev)).status).not.toBe(403);
+    // No Origin, no Sec-Fetch-Site: not a browser — no CSRF to stop.
+    expect((await post('/api/organizations/org-1/members', { Cookie: cookie })).status).not.toBe(403);
+    // A read from elsewhere is no change (and the cookie isn't sent cross-site anyway).
+    expect((await call(`${BASE}/api/organizations/memberships`, { headers: { Cookie: cookie, Origin: 'https://www.arcanum.test' } })).status).not.toBe(403);
+  });
+
+  it("the payment providers' callbacks (server to server) aren't affected", async () => {
+    const res = await post('/api/callback/bancontact', { Origin: 'https://provider.example' });
+    expect(((await res.json()) as { path: string }).path).toBe('/callback/bancontact');
+  });
+});
+
+describe('no credentials to the Workers behind that do without', () => {
+  it('the API: identity headers only — no session cookie, no access token, nothing a client put in Authorization', async () => {
+    const cookie = `__Host-session_id=${await storeSession({ access_token: 'secret-access-token' })}`;
+    const res = await call(`${BASE}/api/organizations/memberships`, { headers: { Cookie: cookie, Authorization: 'Bearer i-am-the-internal-key' } });
+    const echo = (await res.json()) as { headers: Record<string, string> };
+    expect(echo.headers.authorization).toBeUndefined();
+    expect(echo.headers.cookie).toBeUndefined();
+    expect(echo.headers['x-user-sub']).toBe('u9');
+  });
+
+  it('the screens and the notification socket get no cookie either', async () => {
+    const cookie = `__Host-session_id=${await storeSession()}`;
+    const frontends = vi.spyOn(env.ARCANUM_FRONTENDS_SERVICE!, 'fetch');
+    await call(`${BASE}/console`, { headers: { Cookie: cookie, Accept: 'text/html' } });
+    const sent = new Headers(((frontends.mock.calls[0] as unknown[])[1] as RequestInit).headers);
+    expect(sent.get('cookie')).toBeNull();
+    const devicehub = vi.spyOn(env.ARCANUM_DEVICEHUB_SERVICE, 'fetch').mockResolvedValue(new Response('ok'));
+    await call(`${BASE}/devices/connect?token=t`, { headers: { Cookie: cookie } });
+    expect((devicehub.mock.calls[0][0] as Request).headers.get('cookie')).toBeNull();
+  });
+});
+
+describe('a refused sign-in', () => {
+  it('tells the browser nothing about why (that goes to the log)', async () => {
+    const res = await call(`${BASE}/callback?code=c&state=forged`);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Aanmelden is mislukt. Probeer opnieuw.' });
+  });
+});

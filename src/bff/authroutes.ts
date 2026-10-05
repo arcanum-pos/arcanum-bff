@@ -46,8 +46,10 @@ export class AuthRoutesHandler {
       const [userSessionData, error] = await oauth.callback(url.searchParams.get('code') ?? '', url.searchParams.get('state') ?? '', stateCookie);
 
       if (error || !userSessionData) {
+        // The detail goes to the log, not to the browser.
+        console.warn('Sign-in callback refused:', error ?? 'unknown');
         headers.set('Content-Type', 'application/json');
-        return new Response(JSON.stringify({ error: error ?? 'Unknown error' }), { status: 400, headers });
+        return new Response(JSON.stringify({ error: 'Aanmelden is mislukt. Probeer opnieuw.' }), { status: 400, headers });
       }
 
       const returnTo = sanitizeReturnTo(await OAuthHandler.returnTo(this.env, stateCookie));

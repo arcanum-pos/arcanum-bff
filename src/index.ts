@@ -103,6 +103,16 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
       return corsResponse(jsonResponse({ error: 'Not found' }, 404), request, env);
     }
 
+    // Changes only from this very site. SameSite=Lax still sends the session
+    // cookie on requests from a sibling subdomain (same site, other origin —
+    // www.<the same domain>, say); those must not drive the API or the
+    // installer. The payment providers' callbacks (server to server) are no
+    // browsers and carry no session.
+    const writes = request.method !== 'GET' && request.method !== 'HEAD';
+    if (writes && ((path.startsWith('/api') && !path.startsWith('/api/callback')) || isInstallerPath(path)) && !fromThisSite(request, env)) {
+      return corsResponse(jsonResponse({ error: 'Not allowed from another site' }, 403), request, env);
+    }
+
     // arcanum-installer behind this BFF (self-hosted installations only —
     // see bff/installer.ts). Without it, as if the route didn't exist. The
     // bare /installer redirects: the installer's page uses relative paths.
@@ -143,10 +153,17 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // understand the protocol.
     if (path === '/devices/connect') {
       const isDevelopment = env.FRONTEND_URL?.includes('localhost') || env.FRONTEND_URL?.includes('127.0.0.1');
+      // The socket's own short-lived token does the work: no session cookie along.
+      const forward = (target: string) => {
+        const req = new Request(target, request);
+        req.headers.delete('Cookie');
+        req.headers.delete('Authorization');
+        return req;
+      };
       if (isDevelopment && env.DEVICEHUB_LOCAL_URL) {
-        return fetch(new Request(`${env.DEVICEHUB_LOCAL_URL}${path}${url.search}`, request));
+        return fetch(forward(`${env.DEVICEHUB_LOCAL_URL}${path}${url.search}`));
       }
-      return env.ARCANUM_DEVICEHUB_SERVICE.fetch(new Request(`https://devicehub${path}${url.search}`, request));
+      return env.ARCANUM_DEVICEHUB_SERVICE.fetch(forward(`https://devicehub${path}${url.search}`));
     }
 
     // arcanum-frontends' shared Vite asset prefix — JS/CSS for every entry
@@ -260,6 +277,20 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     }
 
     return new Response(null, { status: 404 });
+}
+
+// A request from this very site: its own origin (the workers.dev address or
+// the custom domain, whichever the browser is on), FRONTEND_URL's, or an
+// ALLOWED_ORIGINS one (local development) — by Origin, else by the
+// browser's Sec-Fetch-Site. Neither header: not a browser, so no CSRF.
+function fromThisSite(request: Request, env: Env): boolean {
+  const origin = request.headers.get('Origin');
+  if (origin && origin !== 'null') {
+    const allowed = new Set([new URL(request.url).origin, new URL(env.FRONTEND_URL).origin, ...(env.ALLOWED_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean)]);
+    return allowed.has(origin);
+  }
+  const site = request.headers.get('Sec-Fetch-Site');
+  return !site || site === 'same-origin';
 }
 
 function resolveAllowedOrigin(request: Request, env: Env): string {

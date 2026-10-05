@@ -16,6 +16,15 @@ export interface UIProxyTarget {
   fallbackFile: string;
 }
 
+// The screens are static files: the session cookie and any Authorization
+// stay with the bff.
+function withoutCredentials(request: Request): Headers {
+  const headers = new Headers(request.headers);
+  headers.delete('Cookie');
+  headers.delete('Authorization');
+  return headers;
+}
+
 export class UIFrontendProxy {
   private isDevelopment: boolean;
 
@@ -46,7 +55,7 @@ export class UIFrontendProxy {
       return new Response('UI configuration error', { status: 500 });
     }
 
-    const headers = new Headers(request.headers);
+    const headers = withoutCredentials(request);
     headers.delete('host');
     headers.set('X-Forwarded-By', 'bff-http-ui');
 
@@ -81,14 +90,15 @@ export class UIFrontendProxy {
     }
 
     const staticUrl = `http://pages-worker${path}`;
+    const headers = withoutCredentials(request);
     let response = await uiWorker.fetch(staticUrl, {
       method: request.method,
-      headers: request.headers,
+      headers,
     });
 
     if (response.status === 404 && !this.isStaticAsset(path)) {
       const fallbackResponse = await uiWorker.fetch(`http://pages-worker${this.target.fallbackFile}`, {
-        headers: request.headers,
+        headers,
       });
       if (fallbackResponse.ok) {
         response = new Response(await fallbackResponse.text(), {

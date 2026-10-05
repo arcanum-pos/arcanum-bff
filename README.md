@@ -87,10 +87,14 @@ This prints an `id`. Put it into `wrangler.jsonc`'s `kv_namespaces` entry.
 npx wrangler secret put BFF_INTERNAL_KEY
 ```
 
-`BFF_INTERNAL_KEY` must match the same secret set on `arcanum-backend`. The
-BFF also derives two keys of its own from it (HKDF, `src/bff/crypto.ts`):
-one signs the short-lived values a browser carries during a login, one
-encrypts sessions at rest. Rotating it therefore also ends every session.
+The BFF derives two keys of its own from `BFF_INTERNAL_KEY` (HKDF,
+`src/bff/crypto.ts`): one signs the short-lived values a browser carries
+during a login, one encrypts sessions at rest. Rotating it therefore also
+ends every session. The login provider is the BFF's own settings too:
+`DEFAULT_IDP_ISSUER_URL`, `DEFAULT_IDP_CLIENT_ID`, `DEFAULT_IDP_CLIENT_SECRET`
+(+ optional `DEFAULT_IDP_SCOPES`, `DEFAULT_IDP_CONNECTION_NAME`,
+`DEFAULT_IDP_AUTH_CODE_CLIENT_ID/SECRET`) — the installer sets them; the
+endpoints come from the provider's discovery document.
 
 ### 5. Service bindings — deploy order matters
 
@@ -122,7 +126,14 @@ npx wrangler deploy
 - **No bearer tokens**: only the session cookie signs a request in.
 - **Token refresh**: when a parallel request already refreshed, the newer
   tokens in the session are used instead of signing the browser out.
-- **Forwarding**: identity headers a client sends are always replaced;
+- **Writes only from this site**: a non-GET request to `/api/*` (not
+  `/api/callback/*`) or `/installer/*` must come from this origin, the
+  `FRONTEND_URL`'s, or an `ALLOWED_ORIGINS` one (`Origin`, else
+  `Sec-Fetch-Site: same-origin`) — `SameSite=Lax` alone still lets a sibling
+  subdomain send the cookie.
+- **Forwarding**: identity headers a client sends are always replaced; the
+  Workers behind get neither the session cookie nor the access token (nor a
+  client's `Authorization`);
   `/api/bancontact/*` forwards only the payment and ledger paths the screens
   use; `/api/callback/*` (payment providers) is the one unauthenticated pipe.
 - **Headers** on every answer: `X-Frame-Options: DENY` + CSP
