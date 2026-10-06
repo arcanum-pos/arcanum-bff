@@ -243,7 +243,7 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // Root "/" — the org + device-role chooser (arcanum-frontends'
     // chooser.html), authenticated at this point (the public branch above
     // already returned). Its own script checks localStorage first and
-    // redirects straight to kassa/display/simulator.html if this browser is
+    // redirects straight to kassa/display.html if this browser is
     // already registered as a terminal.
     if (path === '/') {
       const chooserProxy = new UIFrontendProxy(env, {
@@ -260,7 +260,12 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // was dropped (not moved) — the admin portal's own Rapporten page
     // (routes/reports.tsx) already covers this, org-wide rather than
     // per-device/slot-scoped.
-    if (path === '/simulator.html' || path === '/display.html' || path === '/kassa.html' || path === '/settings.html') {
+    // The SumUp simulator's page is gone (2026-10-06, SumUp's Virtual Solo
+    // replaces it): a browser that still opens it goes back to the chooser,
+    // which asks again what this device is.
+    if (path === '/simulator.html') return Response.redirect(new URL('/', request.url).toString(), 302);
+
+    if (path === '/display.html' || path === '/kassa.html' || path === '/settings.html') {
       const movedScreenProxy = new UIFrontendProxy(env, {
         service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,

@@ -19,7 +19,7 @@ Browser
        ├─ /api/bancontact/* /api/organizations/* /api/callback/*  (see
        │    src/routes/router.ts)             → service binding → arcanum-backend
        ├─ /api/devices/*                      → service binding → arcanum-devicehub
-       └─ /console, /, /kassa.html, /settings.html, /device, /simulator.html,
+       └─ /console, /, /kassa.html, /settings.html, /device,
             /display.html, and every arcanum-frontends asset  (auth'd, except
             /device*, /devices/connect, and the login prompt itself)
                                                → service binding → arcanum-frontends
@@ -168,8 +168,8 @@ npm run typecheck
    Auth0 login → redirected back, session cookie set, the org/device chooser
    loads.
 2. `GET /whoami` → your identity (sub/email/name).
-3. `/console` loads the admin portal; kassa/settings/the customer display/
-   the SumUp simulator all work end-to-end (real payment flows — verify with
+3. `/console` loads the admin portal; kassa/settings/the customer display
+   all work end-to-end (real payment flows — verify with
    care, not just that the page loads).
 
 ## License

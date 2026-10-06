@@ -200,6 +200,15 @@ describe('the backend behind /api/bancontact', () => {
   });
 });
 
+describe('the former SumUp simulator page', () => {
+  it('sends a browser that still opens it back to the chooser', async () => {
+    const cookie = `__Host-session_id=${await storeSession()}`;
+    const res = await call(`${BASE}/simulator.html`, { headers: { Cookie: cookie, Accept: 'text/html' }, redirect: 'manual' });
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toBe(`${BASE}/`);
+  });
+});
+
 describe('security headers', () => {
   it('on pages and API answers: no framing, nosniff, a referrer policy, HSTS', async () => {
     for (const res of [await call(`${BASE}/console`, { headers: { Accept: 'text/html' } }), await call(`${BASE}/health`), await call(`${BASE}/api/organizations/x`)]) {

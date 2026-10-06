@@ -27,7 +27,7 @@ export interface Env {
   ARCANUM_BACKEND_SERVICE: Fetcher;
   ARCANUM_DEVICEHUB_SERVICE: Fetcher;
   // Every UI screen (admin portal, kassa, settings, the customer display, the
-  // SumUp simulator, the org/device chooser, the login prompt, the
+  // org/device chooser, the login prompt, the
   // device-grant QR page) — reached at /console and a handful of other
   // explicit paths, see index.ts. Optional: unset in an environment that
   // hasn't deployed it yet.
