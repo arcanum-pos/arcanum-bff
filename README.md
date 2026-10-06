@@ -2,7 +2,7 @@
 
 
 Backend-for-frontend for the Arcanum platform. Single front door on
-`arcanum.kaboutersoft.be` (or an own instance's address): handles login
+`demo.arcanum.kaboutersoft.be` (or an own instance's address): handles login
 against the instance's identity provider — one per installation, for every
 org, resolved from arcanum-backend's `GET /identity-provider/resolve` — then
 proxies everything else to the
@@ -11,7 +11,7 @@ publicly reachable.
 
 ```
 Browser
-  └─ arcanum.kaboutersoft.be/*  → arcanum-bff
+  └─ demo.arcanum.kaboutersoft.be/*  → arcanum-bff
        ├─ /login /callback /logout /device*   → the instance's identity provider
        ├─ /whoami                             → current session identity
        ├─ /devices/connect                    → service binding → arcanum-devicehub
@@ -26,7 +26,7 @@ Browser
 ```
 
 Every screen *and* the notification channel are same-origin, so nothing
-here is tied to `arcanum.kaboutersoft.be` specifically: an own instance runs
+here is tied to `demo.arcanum.kaboutersoft.be` specifically: an own instance runs
 on its workers.dev address or on the custom domain its installer attached.
 Login always redirects back to `FRONTEND_URL/callback` (the one address
 registered at the provider) — there is no per-org custom domain or per-org
@@ -61,9 +61,9 @@ In your Auth0 tenant:
 
 1. Create an Application → type **Regular Web Application**.
 2. Enable whichever connection(s) you want as the platform default.
-3. Allowed Callback URLs: `https://arcanum.kaboutersoft.be/callback`
+3. Allowed Callback URLs: `https://demo.arcanum.kaboutersoft.be/callback`
    (add `http://localhost:8787/callback` too if you'll test locally).
-4. Allowed Logout URLs: `https://arcanum.kaboutersoft.be`
+4. Allowed Logout URLs: `https://demo.arcanum.kaboutersoft.be`
 5. Copy the Client ID and Client Secret — you'll need them below.
 6. Do **not** create an Auth0 API for this. Authorization stays in the app.
 
@@ -102,7 +102,7 @@ endpoints come from the provider's discovery document.
 Worker must already be deployed under its exact name before this Worker's
 own deploy will succeed (Wrangler validates bindings at deploy time). Deploy
 `arcanum-backend`, `arcanum-devicehub`, and `arcanum-frontends` first, then
-this Worker last (`wrangler deploy`), which claims `arcanum.kaboutersoft.be`.
+this Worker last (`wrangler deploy`), which claims `demo.arcanum.kaboutersoft.be`.
 
 ### 6. Deploy
 
@@ -164,7 +164,7 @@ npm run typecheck
 
 ## Smoke test after deploying
 
-1. Visit `https://arcanum.kaboutersoft.be/` unauthenticated → login prompt →
+1. Visit `https://demo.arcanum.kaboutersoft.be/` unauthenticated → login prompt →
    Auth0 login → redirected back, session cookie set, the org/device chooser
    loads.
 2. `GET /whoami` → your identity (sub/email/name).
