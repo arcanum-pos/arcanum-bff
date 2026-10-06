@@ -190,11 +190,11 @@ describe('token refresh', () => {
 describe('the backend behind /api/bancontact', () => {
   it('only the payment and ledger paths the screens use are forwarded', async () => {
     const cookie = `__Host-session_id=${await storeSession()}`;
-    for (const path of ['/payments', '/transactions', '/sumup/charge', '/sumup/confirm', '/sumup/readers', '/sumup/status/abc123']) {
+    for (const path of ['/payments', '/transactions', '/sumup/charge', '/sumup/confirm', '/sumup/readers', '/sumup/readers/rdr_1', '/sumup/status/abc123']) {
       const res = await call(`${BASE}/api/bancontact${path}`, { headers: { Cookie: cookie } });
       expect(((await res.json()) as { path: string }).path, path).toBe(path);
     }
-    for (const path of ['/identity-provider/resolve', '/internal/demo-orgs', '/organizations/x/members', '/sumup/status/a/b', '']) {
+    for (const path of ['/identity-provider/resolve', '/internal/demo-orgs', '/organizations/x/members', '/sumup/status/a/b', '/sumup/readers/a/b', '']) {
       expect((await call(`${BASE}/api/bancontact${path}`, { headers: { Cookie: cookie } })).status, path || '(bare)').toBe(404);
     }
   });
