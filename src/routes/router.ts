@@ -22,14 +22,15 @@ const ROUTES: RouteDefinition[] = [
     rewritePath: { from: '/api/bancontact', to: '' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
   },
-  // Device registration/linking/ws-token — a separate Worker (arcanum-devicehub)
-  // from payment processing, on purpose. The WebSocket itself (/devices/connect)
-  // is a different, unprefixed route (see index.ts) — public/no-session by
-  // design, using the short-lived token minted by /api/devices/ws-token
-  // (session-checked, right here) instead. Deliberately not under /api/devices
-  // so it isn't gated by this route's requireAuth.
+  // arcanum-devicehub: only a device's own notification token. Registering,
+  // linking and removing devices go through arcanum-backend
+  // (/api/organizations/:org/devices…, devices.ts), which checks who's
+  // asking — devicehub doesn't know people and refuses them without its
+  // internal key anyway. The WebSocket itself (/devices/connect) is a
+  // different, unprefixed route (see index.ts) — public/no-session by
+  // design, using the short-lived token minted here (session-checked).
   {
-    pattern: /^\/api\/devices(\/|$)/,
+    pattern: /^\/api\/devices\/ws-token$/,
     service: 'ARCANUM_DEVICEHUB_SERVICE',
     requireAuth: true,
     rewritePath: { from: '/api/devices', to: '/devices' },

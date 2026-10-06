@@ -200,6 +200,18 @@ describe('the backend behind /api/bancontact', () => {
   });
 });
 
+describe('arcanum-devicehub behind /api/devices', () => {
+  it("only a device's own notification token is forwarded; the registry goes through the backend", async () => {
+    const cookie = `__Host-session_id=${await storeSession()}`;
+    const token = await call(`${BASE}/api/devices/ws-token?terminal_id=t1`, { headers: { Cookie: cookie } });
+    expect(token.status).not.toBe(404);
+    for (const path of ['/register', '/by-org/org-1', '/remove', '/link', '/unlink', '/reset', '/unlinked?role=cfd&org_id=o', '/t1', '/t1/linked?role=cfd', '']) {
+      const res = await call(`${BASE}/api/devices${path}`, { method: path === '/register' || path === '/remove' ? 'POST' : 'GET', headers: { Cookie: cookie, Origin: BASE } });
+      expect(res.status, path || '(bare)').toBe(404);
+    }
+  });
+});
+
 describe('the former SumUp simulator page', () => {
   it('sends a browser that still opens it back to the chooser', async () => {
     const cookie = `__Host-session_id=${await storeSession()}`;
