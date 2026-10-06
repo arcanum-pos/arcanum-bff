@@ -152,7 +152,7 @@ describe('/logout', () => {
     const id = crypto.randomUUID().replace(/-/g, '');
     const old = { access_token: 'a', id_token: 'tok', refresh_token: null, email: '', name: '', expires_at: Date.now() / 1000 + 3600, issuer: 'https://login.test', authPurpose: 'authcode', orgId: 'pos.some-org.test' } satisfies SessionData & { orgId: string };
     await env.ARCANUM_SESSIONS.put(id, JSON.stringify(old));
-    const res = await call(`${BASE}/logout`, { headers: { Cookie: `session_id=${id}` } });
+    const res = await call(`${BASE}/logout`, { headers: { Cookie: `__Host-session_id=${id}` } });
     const location = new URL(res.headers.get('Location')!);
     expect(`${location.origin}${location.pathname}`).toBe('https://login.test/logout');
     expect(location.searchParams.get('post_logout_redirect_uri')).toBe(BASE);

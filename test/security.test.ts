@@ -117,18 +117,17 @@ describe('login', () => {
   });
 });
 
-describe('sessions from before', () => {
-  it('a plain-JSON session under the old cookie name keeps working, and moves to the new name', async () => {
+describe('the old session_id cookie', () => {
+  it('is never read any more (a sibling subdomain could plant one) — and a browser that still sends it gets it cleared', async () => {
     const id = 'a'.repeat(64);
     await env.ARCANUM_SESSIONS.put(id, JSON.stringify({ access_token: 'x', id_token: fakeJwt({ sub: 'old', email: 'old@example.test' }), refresh_token: null, email: 'old@example.test', name: '', expires_at: Date.now() / 1000 + 3600, issuer: 'https://login.test', authPurpose: 'authcode' }));
     const res = await call(`${BASE}/whoami`, { headers: { Cookie: `session_id=${id}` } });
-    expect(res.status).toBe(200);
-    const set = res.headers.getSetCookie();
-    expect(set.some((c) => c.startsWith(`__Host-session_id=${id};`) && /Secure/.test(c) && /HttpOnly/.test(c))).toBe(true);
-    expect(set.some((c) => /^session_id=;.*Max-Age=0/.test(c))).toBe(true);
-    // Once moved, nothing more to do.
-    const again = await call(`${BASE}/whoami`, { headers: { Cookie: `__Host-session_id=${id}` } });
-    expect(again.headers.getSetCookie()).toEqual([]);
+    expect(res.status).toBe(401);
+    expect(res.headers.getSetCookie()).toEqual(['session_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure']);
+    // Not moved over to the new name.
+    expect(res.headers.getSetCookie().some((c) => c.startsWith('__Host-session_id='))).toBe(false);
+    // A browser with the current cookie only: nothing to clear.
+    expect((await call(`${BASE}/whoami`, { headers: { Cookie: `__Host-session_id=${await storeSession()}` } })).headers.getSetCookie()).toEqual([]);
   });
 });
 

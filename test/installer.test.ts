@@ -25,7 +25,7 @@ async function signIn(): Promise<string> {
     authPurpose: 'authcode',
   };
   await env.ARCANUM_SESSIONS.put(id, JSON.stringify(session));
-  return `session_id=${id}`;
+  return `__Host-session_id=${id}`;
 }
 
 interface Echo {

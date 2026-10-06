@@ -6,7 +6,7 @@ import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
 import { forwardToInstaller, installerAvailable, isInstallerPath } from './bff/installer';
 import { Router, isKnownApiRoute, routeRequiresAuth } from './routes/router';
-import { buildSessionCookie, cookieValue, isDevelopment, LEGACY_SESSION_COOKIE, sessionCookieName } from './bff/cookie';
+import { cookieValue, isDevelopment, LEGACY_SESSION_COOKIE, sessionCookieName } from './bff/cookie';
 
 // See LICENSE (AGPL-3.0-or-later) and the /version route below.
 const DEFAULT_SOURCE_URL = 'https://github.com/arcanum-pos';
@@ -30,9 +30,8 @@ export default {
 };
 
 // Security headers on everything this BFF answers (without overriding what
-// an upstream set itself, like the installer's own CSP), and the session
-// cookie moved to its current name (bff/cookie.ts) for a browser that
-// still has the old one — same session, nobody signed out.
+// an upstream set itself, like the installer's own CSP), and an old
+// session_id cookie cleared where it's no longer the name (bff/cookie.ts).
 function finish(request: Request, env: Env, upstream: Response): Response {
   const response = new Response(upstream.body, upstream);
   const h = response.headers;
@@ -48,14 +47,8 @@ function finish(request: Request, env: Env, upstream: Response): Response {
   else if (!/frame-ancestors/.test(csp)) h.set('Content-Security-Policy', `${csp}; frame-ancestors 'none'`);
   if (!isDevelopment(env)) setIfAbsent('Strict-Transport-Security', 'max-age=31536000');
 
-  const current = sessionCookieName(env);
-  if (current !== LEGACY_SESSION_COOKIE) {
-    const legacy = cookieValue(request, LEGACY_SESSION_COOKIE);
-    const setsSession = (h.get('Set-Cookie') ?? '').includes('session_id=');
-    if (legacy && !cookieValue(request, current) && !setsSession && /^[0-9a-f]{64}$/.test(legacy)) {
-      h.append('Set-Cookie', buildSessionCookie(env, legacy));
-      h.append('Set-Cookie', `${LEGACY_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`);
-    }
+  if (sessionCookieName(env) !== LEGACY_SESSION_COOKIE && cookieValue(request, LEGACY_SESSION_COOKIE) !== null && !(h.get('Set-Cookie') ?? '').startsWith(`${LEGACY_SESSION_COOKIE}=`)) {
+    h.append('Set-Cookie', `${LEGACY_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`);
   }
   return response;
 }

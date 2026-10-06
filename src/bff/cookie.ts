@@ -7,10 +7,10 @@ import type { Env } from '../types';
 //
 // Named __Host-session_id: the browser then only accepts it Secure, for
 // Path=/ and without a Domain — no other (sub)domain can plant or overwrite
-// it. Plain session_id where that can't hold: local development over http,
-// or a COOKIE_DOMAIN shared with another subdomain. A browser that still
-// has the old session_id keeps its session: it's read too, and moved over
-// to the new name on its next response (index.ts).
+// it. Plain session_id only where that can't hold: local development over
+// http, or a COOKIE_DOMAIN shared with another subdomain. Elsewhere an old
+// session_id is never read (a sibling subdomain could plant one): a browser
+// that still sends it is signed out, and it's cleared (index.ts).
 
 export const LEGACY_SESSION_COOKIE = 'session_id';
 
@@ -44,9 +44,9 @@ export function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-// The session id: the current cookie name first, else the old one.
+// The session id — under this installation's cookie name only.
 export function sessionIdFrom(request: Request, env: Env): string | null {
-  return cookieValue(request, sessionCookieName(env)) ?? cookieValue(request, LEGACY_SESSION_COOKIE);
+  return cookieValue(request, sessionCookieName(env));
 }
 
 // The login's own short-lived cookie (bff/auth.ts): its signed state.

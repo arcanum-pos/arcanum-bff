@@ -116,7 +116,7 @@ npx wrangler deploy
   (`Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`; plain `session_id` only in
   local development or with `COOKIE_DOMAIN`). The session itself — access,
   refresh and id token — is AES-GCM-encrypted in KV. An old `session_id`
-  cookie is still read and moved to the new name.
+  cookie is never read (a sibling subdomain could plant one); it's cleared.
 - **Login** (`/login` → provider → `/callback`): PKCE S256; the verifier,
   the `state` and where to land travel in a signed, 10-minute `oauth_state`
   cookie, so `/callback` only goes on for the browser that started the login
