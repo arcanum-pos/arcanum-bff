@@ -57,7 +57,6 @@ export interface Env {
   DEFAULT_IDP_ISSUER_URL?: string;
   DEFAULT_IDP_CLIENT_ID?: string;
   DEFAULT_IDP_CLIENT_SECRET?: string;
-  DEFAULT_IDP_CONNECTION_NAME?: string;
   DEFAULT_IDP_SCOPES?: string;
   DEFAULT_IDP_AUTH_CODE_CLIENT_ID?: string;
   DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET?: string;
@@ -117,7 +116,6 @@ export interface OAuthSettings {
   OAUTH_CLIENT_SECRET: string;
   FRONTEND_URL: string;
   REDIRECT_URI: string;
-  OAUTH_CONNECTION?: string;
   issuerUrl: string;
   scope?: string;
   endpoints: OAuthEndpoints;
@@ -149,7 +147,6 @@ export interface IdpSettings {
   issuerUrl: string;
   clientId: string;
   clientSecret: string;
-  connectionName?: string;
   scope?: string;
   endpoints: OAuthEndpoints;
 }

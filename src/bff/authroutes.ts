@@ -22,7 +22,6 @@ export class AuthRoutesHandler {
       OAUTH_CLIENT_SECRET: idp.clientSecret,
       FRONTEND_URL: this.env.FRONTEND_URL,
       REDIRECT_URI: `${this.env.FRONTEND_URL}/callback`,
-      OAUTH_CONNECTION: idp.connectionName,
       issuerUrl: idp.issuerUrl,
       scope: idp.scope,
       endpoints: idp.endpoints,

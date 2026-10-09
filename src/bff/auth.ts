@@ -23,7 +23,6 @@ export class OAuthHandler {
   private authEndpoint: string;
   private tokenEndpoint: string;
   private userinfoEndpoint: string;
-  private connection?: string;
   private issuerUrl: string;
   private scope: string;
 
@@ -34,7 +33,6 @@ export class OAuthHandler {
     this.authEndpoint = settings.endpoints.authEndpoint;
     this.tokenEndpoint = settings.endpoints.tokenEndpoint;
     this.userinfoEndpoint = settings.endpoints.userinfoEndpoint;
-    this.connection = settings.OAUTH_CONNECTION;
     this.issuerUrl = settings.issuerUrl;
     // Auth0 needs 'offline_access' in scope to issue a refresh token; Google
     // rejects that scope outright (invalid_scope) and has no equivalent for
@@ -59,10 +57,6 @@ export class OAuthHandler {
       code_challenge_method: 'S256',
       state,
     });
-
-    if (this.connection) {
-      params.set('connection', this.connection);
-    }
 
     const authUrl = `${this.authEndpoint}?${params.toString()}`;
     return [authUrl, cookie];

@@ -92,7 +92,7 @@ The BFF derives two keys of its own from `BFF_INTERNAL_KEY` (HKDF,
 during a login, one encrypts sessions at rest. Rotating it therefore also
 ends every session. The login provider is the BFF's own settings too:
 `DEFAULT_IDP_ISSUER_URL`, `DEFAULT_IDP_CLIENT_ID`, `DEFAULT_IDP_CLIENT_SECRET`
-(+ optional `DEFAULT_IDP_SCOPES`, `DEFAULT_IDP_CONNECTION_NAME`,
+(+ optional `DEFAULT_IDP_SCOPES`,
 `DEFAULT_IDP_AUTH_CODE_CLIENT_ID/SECRET`) — the installer sets them; the
 endpoints come from the provider's discovery document.
 

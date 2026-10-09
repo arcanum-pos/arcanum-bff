@@ -58,12 +58,14 @@ describe("the login provider from the bff's own settings", () => {
   it("/login goes to the discovered authorize endpoint with the bff's own client — the backend isn't asked", async () => {
     const seen = mockOwnProvider({ issuer: 'https://own-idp.test-unique-1' });
     const backend = vi.spyOn(env.ARCANUM_BACKEND_SERVICE, 'fetch');
-    const res = await call('/login', { ...OWN, DEFAULT_IDP_ISSUER_URL: 'https://own-idp.test' });
+    const res = await call('/login', { ...OWN, DEFAULT_IDP_ISSUER_URL: 'https://own-idp.test', DEFAULT_IDP_CONNECTION_NAME: 'google-oauth2' } as any);
     expect(res.status).toBe(302);
     const authorize = new URL(res.headers.get('Location')!);
     expect(`${authorize.origin}${authorize.pathname}`).toBe('https://own-idp.test/authorize');
     expect(authorize.searchParams.get('client_id')).toBe('own-device-client');
     expect(authorize.searchParams.get('scope')).toBe('openid profile email offline_access');
+    // No Auth0 `connection` any more, even when an old secret is still set.
+    expect(authorize.searchParams.has('connection')).toBe(false);
     expect(seen.some((s) => s.url.endsWith('/.well-known/openid-configuration'))).toBe(true);
     expect(backend).not.toHaveBeenCalled();
   });

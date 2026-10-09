@@ -51,7 +51,6 @@ export async function resolveIdpSettings(env: Env, purpose: 'device' | 'authcode
     issuerUrl: env.DEFAULT_IDP_ISSUER_URL!,
     clientId: authCode ? env.DEFAULT_IDP_AUTH_CODE_CLIENT_ID! : env.DEFAULT_IDP_CLIENT_ID!,
     clientSecret: authCode ? env.DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET! : env.DEFAULT_IDP_CLIENT_SECRET!,
-    connectionName: env.DEFAULT_IDP_CONNECTION_NAME || undefined,
     scope: env.DEFAULT_IDP_SCOPES?.trim() || undefined,
     endpoints: await discoverEndpoints(env.DEFAULT_IDP_ISSUER_URL!),
   };

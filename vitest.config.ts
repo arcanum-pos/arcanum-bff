@@ -30,7 +30,6 @@ const unused = () => Response.json({ error: 'not stubbed' }, { status: 500 });
 // back — so a test can see which path and identity headers it got.
 const IDP = {
   issuerUrl: 'https://login.test',
-  connectionName: null,
   scopes: null,
   endpoints: {
     authorization_endpoint: 'https://login.test/authorize',
