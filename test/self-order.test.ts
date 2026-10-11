@@ -31,6 +31,8 @@ describe('self-ordering without a session', () => {
     expect(((await (await call('/api/public/orders/a-token')).json()) as { path: string }).path).toBe('/public/orders/a-token');
     const placed = await call('/api/public/self-order/the-code/orders', { method: 'POST', headers: { Origin: BASE, 'Content-Type': 'application/json' }, body: '{}' });
     expect(((await placed.json()) as { path: string }).path).toBe('/public/self-order/the-code/orders');
+    const pay = await call('/api/public/orders/a-token/bancontact', { method: 'POST', headers: { Origin: BASE } });
+    expect(((await pay.json()) as { path: string }).path).toBe('/public/orders/a-token/bancontact');
   });
 
   it('only those public routes: anything else under /api/public is unknown, and orders only from this site', async () => {
