@@ -92,9 +92,17 @@ The BFF derives two keys of its own from `BFF_INTERNAL_KEY` (HKDF,
 during a login, one encrypts sessions at rest. Rotating it therefore also
 ends every session. The login provider is the BFF's own settings too:
 `DEFAULT_IDP_ISSUER_URL`, `DEFAULT_IDP_CLIENT_ID`, `DEFAULT_IDP_CLIENT_SECRET`
-(+ optional `DEFAULT_IDP_SCOPES`,
-`DEFAULT_IDP_AUTH_CODE_CLIENT_ID/SECRET`) — the installer sets them; the
-endpoints come from the provider's discovery document.
+(+ optional `DEFAULT_IDP_SCOPES`, and `DEFAULT_IDP_DEVICE_CLIENT_ID/SECRET`
+for a separate QR / device-grant client, which Google needs; without it the
+primary client — the browser's — also does the QR sign-in) — the installer
+sets them; the endpoints come from the provider's discovery document.
+
+A paired **station screen or customer display** needs no session: it's
+paired at `/pair` with its code alone, and its own key (arcanum-backend
+`device-keys.ts`) is kept as the HttpOnly cookie `__Host-arcanum_device`,
+passed on as `X-Device-Key` — only on routes marked `allowDevice`, never next
+to a session, never as a client sent it. It opens `/`, `/station.html` and
+`/display.html`; everything else stays behind a sign-in.
 
 ### 5. Service bindings — deploy order matters
 

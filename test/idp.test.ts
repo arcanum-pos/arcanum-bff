@@ -10,7 +10,9 @@ const OWN = {
   DEFAULT_IDP_ISSUER_URL: 'https://own-idp.test',
   DEFAULT_IDP_CLIENT_ID: 'own-device-client',
   DEFAULT_IDP_CLIENT_SECRET: 'own-device-secret',
-  // No separate browser client unless a test sets one.
+  // No separate client unless a test sets one.
+  DEFAULT_IDP_DEVICE_CLIENT_ID: '',
+  DEFAULT_IDP_DEVICE_CLIENT_SECRET: '',
   DEFAULT_IDP_AUTH_CODE_CLIENT_ID: '',
   DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET: '',
 };
@@ -70,7 +72,20 @@ describe("the login provider from the bff's own settings", () => {
     expect(backend).not.toHaveBeenCalled();
   });
 
-  it('a separate browser client (Google) for /login, the main one for the device grant; scopes as set', async () => {
+  it('one client for both (login.kaboutersoft.be); a separate QR client (Google) only for the device grant', async () => {
+    const seen = mockOwnProvider();
+    // One client: /login and the device grant both with it.
+    expect(new URL((await call('/login', OWN)).headers.get('Location')!).searchParams.get('client_id')).toBe('own-device-client');
+    await call('/device/start', OWN, { method: 'POST' });
+    expect(new URLSearchParams(seen.filter((x) => x.url === 'https://own-idp.test/device/code').at(-1)!.body).get('client_id')).toBe('own-device-client');
+    // A separate QR client: the device grant with it, /login still with the primary one.
+    const google = { ...OWN, DEFAULT_IDP_CLIENT_ID: 'web-client', DEFAULT_IDP_CLIENT_SECRET: 'web-secret', DEFAULT_IDP_DEVICE_CLIENT_ID: 'tv-client', DEFAULT_IDP_DEVICE_CLIENT_SECRET: 'tv-secret' };
+    expect(new URL((await call('/login', google)).headers.get('Location')!).searchParams.get('client_id')).toBe('web-client');
+    await call('/device/start', google, { method: 'POST' });
+    expect(new URLSearchParams(seen.filter((x) => x.url === 'https://own-idp.test/device/code').at(-1)!.body).get('client_id')).toBe('tv-client');
+  });
+
+  it('settings from before 2026-10-12 (a separate browser client) still work until the installer replaces them', async () => {
     const seen = mockOwnProvider();
     const google = { ...OWN, DEFAULT_IDP_AUTH_CODE_CLIENT_ID: 'web-client', DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET: 'web-secret', DEFAULT_IDP_SCOPES: 'openid profile email' };
     const authorize = new URL((await call('/login', google)).headers.get('Location')!);

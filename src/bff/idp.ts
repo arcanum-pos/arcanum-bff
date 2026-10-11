@@ -8,9 +8,12 @@ import type { Env, IdpSettings } from '../types';
 // and kept per isolate for an hour.
 //
 // `purpose` picks the OAuth client — 'authcode' for the browser flow
-// (/login), 'device' for the device grant (/device). Some providers (Google)
-// need a separate client per flow: DEFAULT_IDP_AUTH_CODE_CLIENT_ID/SECRET,
-// used for 'authcode' only when both are set.
+// (/login), 'device' for the device grant (/device, the QR sign-in).
+// DEFAULT_IDP_CLIENT_ID/SECRET is the browser's client, and the QR sign-in's
+// too unless there's a separate one: DEFAULT_IDP_DEVICE_CLIENT_ID/SECRET (some
+// providers, Google, need one per flow). Before 2026-10-12 it was the other
+// way round — DEFAULT_IDP_AUTH_CODE_CLIENT_ID/SECRET a separate browser
+// client — still honoured until the installer's next update replaces them.
 //
 // Without DEFAULT_IDP_* nobody can sign in (the installer always sets them;
 // the backend no longer hands the client secret out).
@@ -46,11 +49,12 @@ export function hasOwnIdpSettings(env: Env): boolean {
 
 export async function resolveIdpSettings(env: Env, purpose: 'device' | 'authcode'): Promise<IdpSettings> {
   if (!hasOwnIdpSettings(env)) throw new Error('The login provider is not configured (DEFAULT_IDP_ISSUER_URL, DEFAULT_IDP_CLIENT_ID, DEFAULT_IDP_CLIENT_SECRET)');
-  const authCode = purpose === 'authcode' && env.DEFAULT_IDP_AUTH_CODE_CLIENT_ID && env.DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET;
+  const legacyBrowser = purpose === 'authcode' && env.DEFAULT_IDP_AUTH_CODE_CLIENT_ID && env.DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET;
+  const separateQr = purpose === 'device' && env.DEFAULT_IDP_DEVICE_CLIENT_ID && env.DEFAULT_IDP_DEVICE_CLIENT_SECRET;
   return {
     issuerUrl: env.DEFAULT_IDP_ISSUER_URL!,
-    clientId: authCode ? env.DEFAULT_IDP_AUTH_CODE_CLIENT_ID! : env.DEFAULT_IDP_CLIENT_ID!,
-    clientSecret: authCode ? env.DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET! : env.DEFAULT_IDP_CLIENT_SECRET!,
+    clientId: legacyBrowser ? env.DEFAULT_IDP_AUTH_CODE_CLIENT_ID! : separateQr ? env.DEFAULT_IDP_DEVICE_CLIENT_ID! : env.DEFAULT_IDP_CLIENT_ID!,
+    clientSecret: legacyBrowser ? env.DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET! : separateQr ? env.DEFAULT_IDP_DEVICE_CLIENT_SECRET! : env.DEFAULT_IDP_CLIENT_SECRET!,
     scope: env.DEFAULT_IDP_SCOPES?.trim() || undefined,
     endpoints: await discoverEndpoints(env.DEFAULT_IDP_ISSUER_URL!),
   };

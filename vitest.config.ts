@@ -62,13 +62,13 @@ export default defineConfig({
           DEVICEHUB_LOCAL_URL: '',
           BANCONTACT_LOCAL_URL: '',
           BFF_INTERNAL_KEY: 'test-bff-key',
-          // The instance's login provider (bff/idp.ts): the kassa's client,
-          // and a separate browser client (as for Google).
+          // The instance's login provider (bff/idp.ts): the browser's client,
+          // and a separate QR (device grant) client (as for Google).
           DEFAULT_IDP_ISSUER_URL: 'https://login.test',
-          DEFAULT_IDP_CLIENT_ID: 'device-client',
-          DEFAULT_IDP_CLIENT_SECRET: 'device-secret',
-          DEFAULT_IDP_AUTH_CODE_CLIENT_ID: 'authcode-client',
-          DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET: 'authcode-secret',
+          DEFAULT_IDP_CLIENT_ID: 'authcode-client',
+          DEFAULT_IDP_CLIENT_SECRET: 'authcode-secret',
+          DEFAULT_IDP_DEVICE_CLIENT_ID: 'device-client',
+          DEFAULT_IDP_DEVICE_CLIENT_SECRET: 'device-secret',
           INSTALLER_INTERNAL_KEY: 'test-installer-key',
         },
         // The provider's discovery document (bff/idp.ts fetches it); nothing else leaves.

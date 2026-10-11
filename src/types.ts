@@ -58,6 +58,10 @@ export interface Env {
   DEFAULT_IDP_CLIENT_ID?: string;
   DEFAULT_IDP_CLIENT_SECRET?: string;
   DEFAULT_IDP_SCOPES?: string;
+  // The QR sign-in's own client, when the provider needs one (Google).
+  DEFAULT_IDP_DEVICE_CLIENT_ID?: string;
+  DEFAULT_IDP_DEVICE_CLIENT_SECRET?: string;
+  // Before 2026-10-12: a separate browser client (bff/idp.ts), until the installer replaces it.
   DEFAULT_IDP_AUTH_CODE_CLIENT_ID?: string;
   DEFAULT_IDP_AUTH_CODE_CLIENT_SECRET?: string;
   // Local `wrangler dev` HTTP fallbacks (set via .dev.vars only, unused in production
