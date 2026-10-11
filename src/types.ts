@@ -132,6 +132,9 @@ export interface AuthResult {
   token: string;
   authMethod: 'session' | 'public';
   identity?: NormalizedIdentity;
+  // Nobody signed in, but a paired station screen or customer display: its
+  // own key (bff/cookie.ts), passed on as X-Device-Key where a route allows it.
+  deviceKey?: string;
 }
 
 export function isSessionData(data: SessionData | NormalizedIdentity | string): data is SessionData {

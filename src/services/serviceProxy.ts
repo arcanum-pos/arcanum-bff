@@ -22,6 +22,7 @@ export function setIdentityHeaders(headers: Headers, authResult: AuthResult): vo
 
 interface ForwardOptions {
   requireAuth?: boolean;
+  allowDevice?: boolean;
   rewritePath?: RewritePath;
   local_url?: string;
   debug?: boolean;
@@ -43,7 +44,7 @@ export class ServiceProxy {
       }
 
       const token = this.getAccessToken();
-      if (!token && options.requireAuth !== false) {
+      if (!token && options.requireAuth !== false && !this.deviceKeyFor(options)) {
         return this.errorResponse('Unauthorized', 401);
       }
 
@@ -60,10 +61,22 @@ export class ServiceProxy {
     return this.authResult.token || null;
   }
 
+  // A paired device's key — only where the route allows it, and never next to a session.
+  private deviceKeyFor(options: ForwardOptions): string | null {
+    return !this.getAccessToken() && options.allowDevice && this.authResult.deviceKey ? this.authResult.deviceKey : null;
+  }
+
+  // Whatever X-Device-Key a client sent is dropped; the real one (from the cookie) set where allowed.
+  private setDeviceKey(headers: Headers, options: ForwardOptions): void {
+    headers.delete('X-Device-Key');
+    const key = this.deviceKeyFor(options);
+    if (key) headers.set('X-Device-Key', key);
+  }
+
   private async forwardViaHttp(request: Request, options: ForwardOptions): Promise<Response> {
     try {
       const token = this.getAccessToken();
-      if (!token && options.requireAuth !== false) {
+      if (!token && options.requireAuth !== false && !this.deviceKeyFor(options)) {
         return this.errorResponse('Unauthorized', 401);
       }
 
@@ -80,6 +93,7 @@ export class ServiceProxy {
       headers.set('X-Forwarded-By', 'bff-http');
       headers.set('X-Request-ID', crypto.randomUUID());
       setIdentityHeaders(headers, this.authResult);
+      this.setDeviceKey(headers, options);
 
       const response = await fetch(fullUrl, {
         method: request.method,
@@ -104,6 +118,7 @@ export class ServiceProxy {
     newHeaders.set('X-Forwarded-By', 'bff');
     newHeaders.set('X-Request-ID', crypto.randomUUID());
     setIdentityHeaders(newHeaders, this.authResult);
+    this.setDeviceKey(newHeaders, options);
 
     const url = new URL(request.url);
     url.pathname = this.applyRewritePath(url.pathname, options.rewritePath);

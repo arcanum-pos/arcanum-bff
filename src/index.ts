@@ -5,8 +5,8 @@ import { DeviceRoutesHandler } from './bff/deviceroutes';
 import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
 import { forwardToInstaller, installerAvailable, isInstallerPath } from './bff/installer';
-import { Router, isKnownApiRoute, routeRequiresAuth } from './routes/router';
-import { cookieValue, isDevelopment, LEGACY_SESSION_COOKIE, sessionCookieName } from './bff/cookie';
+import { Router, isKnownApiRoute, routeAllowsDevice, routeRequiresAuth } from './routes/router';
+import { buildDeviceCookie, cookieValue, deviceKeyFrom, isDevelopment, LEGACY_SESSION_COOKIE, sessionCookieName } from './bff/cookie';
 
 // See LICENSE (AGPL-3.0-or-later) and the /version route below.
 const DEFAULT_SOURCE_URL = 'https://github.com/arcanum-pos';
@@ -156,6 +156,18 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
       return selfOrderProxy.handleRequest(request, '/selforder.html');
     }
 
+    // Pairing a station screen or customer display with its code alone (no
+    // account needed): arcanum-frontends' pair.html. A kassa's code sends
+    // the person on to sign in first.
+    if (path === '/pair') {
+      const pairProxy = new UIFrontendProxy(env, {
+        service: env.ARCANUM_FRONTENDS_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/pair.html',
+      });
+      return pairProxy.handleRequest(request, '/pair.html');
+    }
+
     // A follow page's live updates: arcanum-devicehub's order hub. Like
     // /devices/connect below, a pure forwarding hop — the socket's own
     // short-lived ticket (from /api/public/orders/<token>) does the work.
@@ -191,6 +203,9 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     }
 
     const auth = await authresult(request, env, sessionStore);
+    // Nobody signed in, but a paired station screen or customer display: its key.
+    const deviceKey = auth.authMethod === 'public' ? deviceKeyFrom(request, env) : null;
+    if (deviceKey) auth.deviceKey = deviceKey;
 
     if (path === '/whoami') {
       const result = await processWhoAmi(request, auth, env);
@@ -207,17 +222,25 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     }
 
     if (path.startsWith('/api')) {
-      if (auth.authMethod === 'public' && routeRequiresAuth(path)) {
+      // A paired device's notification token: the backend checks it's that
+      // device's own key (devicehub doesn't know keys).
+      if (path === '/api/devices/ws-token' && auth.authMethod === 'public' && deviceKey) {
+        return corsResponse(await deviceWsToken(request, env, deviceKey), request, env);
+      }
+      if (auth.authMethod === 'public' && routeRequiresAuth(path) && !(deviceKey && routeAllowsDevice(path))) {
         return corsResponse(jsonResponse({ error: 'Unauthorized' }, 401), request, env);
       }
       const router = new Router(env, auth);
       const response = await router.dispatch(request);
+      if (response && path === '/api/public/pair') return corsResponse(await keepDeviceKey(response, env), request, env);
       if (response) return corsResponse(response, request, env);
       return corsResponse(jsonResponse({ error: 'Not found' }, 404), request, env);
     }
 
-    // All other paths → UI (gated behind auth)
-    if (auth.authMethod === 'public') {
+    // All other paths → UI (gated behind auth) — a paired station screen or
+    // customer display opens its own page (and the start page, which sends
+    // it there) with its key: the pages hold no data, its API calls are checked.
+    if (auth.authMethod === 'public' && !(deviceKey && DEVICE_PAGES.has(path))) {
       // Only show browsers a login prompt; scanners and API clients get 401.
       if (!request.headers.get('Accept')?.includes('text/html')) {
         return new Response(null, { status: 401 });
@@ -290,6 +313,30 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     }
 
     return new Response(null, { status: 404 });
+}
+
+const DEVICE_PAGES = new Set(['/', '/station.html', '/display.html']);
+
+// The answer to /api/public/pair: a device paired with its code alone gets
+// its key as a cookie — taken out of the answer, so the page's scripts never
+// hold it.
+async function keepDeviceKey(response: Response, env: Env): Promise<Response> {
+  if (response.status !== 201) return response;
+  const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body || typeof body.deviceKey !== 'string') return jsonResponse(body, response.status);
+  const { deviceKey, ...device } = body;
+  const out = jsonResponse(device, 201);
+  out.headers.append('Set-Cookie', buildDeviceCookie(env, deviceKey as string));
+  return out;
+}
+
+async function deviceWsToken(request: Request, env: Env, deviceKey: string): Promise<Response> {
+  const url = new URL(request.url);
+  const headers = new Headers({ 'X-Device-Key': deviceKey, 'X-Forwarded-By': 'bff' });
+  const target = `/organizations/device-ws-token${url.search}`;
+  const isDev = env.FRONTEND_URL?.includes('localhost') || env.FRONTEND_URL?.includes('127.0.0.1');
+  if (isDev && env.BANCONTACT_LOCAL_URL) return fetch(`${env.BANCONTACT_LOCAL_URL}${target}`, { headers });
+  return env.ARCANUM_BACKEND_SERVICE.fetch(new Request(`https://backend${target}`, { headers }));
 }
 
 // A request from this very site: its own origin (the workers.dev address or

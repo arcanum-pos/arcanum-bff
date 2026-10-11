@@ -49,6 +49,26 @@ export function sessionIdFrom(request: Request, env: Env): string | null {
   return cookieValue(request, sessionCookieName(env));
 }
 
+// A station screen's or customer display's own key (arcanum-backend
+// device-keys.ts): set when it's paired with its code alone (/pair), kept
+// until the device is removed in the console — so ten years, and HttpOnly:
+// the page's scripts never see it. __Host- like the session cookie, where it
+// can be. Signing out a person leaves it alone: the device stays paired.
+export function deviceCookieName(env: Env): string {
+  return isDevelopment(env) || env.COOKIE_DOMAIN ? 'arcanum_device' : '__Host-arcanum_device';
+}
+
+export function buildDeviceCookie(env: Env, key: string): string {
+  const base = `${deviceCookieName(env)}=${key}; Path=/; HttpOnly; SameSite=Lax; Max-Age=315360000`;
+  if (isDevelopment(env)) return base;
+  return env.COOKIE_DOMAIN ? `${base}; Domain=${env.COOKIE_DOMAIN}; Secure` : `${base}; Secure`;
+}
+
+export function deviceKeyFrom(request: Request, env: Env): string | null {
+  const key = cookieValue(request, deviceCookieName(env));
+  return key && /^[A-Za-z0-9_-]{20,100}$/.test(key) ? key : null;
+}
+
 // The login's own short-lived cookie (bff/auth.ts): its signed state.
 export const LOGIN_STATE_COOKIE = 'oauth_state';
 

@@ -9,6 +9,10 @@ interface RouteDefinition {
   // env var holding the local `wrangler dev` URL to forward to instead of the service
   // binding, only used when running locally (FRONTEND_URL contains localhost/127.0.0.1)
   localUrlEnv?: keyof Env;
+  // A paired device's own key may stand in for a session (arcanum-backend
+  // device-keys.ts decides what it may reach — only its device's own few
+  // things); sent as X-Device-Key, never with a session.
+  allowDevice?: boolean;
 }
 
 const ROUTES: RouteDefinition[] = [
@@ -21,6 +25,7 @@ const ROUTES: RouteDefinition[] = [
     requireAuth: true,
     rewritePath: { from: '/api/bancontact', to: '' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
+    allowDevice: true,
   },
   // arcanum-devicehub: only a device's own notification token. Registering,
   // linking and removing devices go through arcanum-backend
@@ -46,6 +51,16 @@ const ROUTES: RouteDefinition[] = [
     service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: true,
     rewritePath: { from: '/api/organizations', to: '/organizations' },
+    localUrlEnv: 'BANCONTACT_LOCAL_URL',
+    allowDevice: true,
+  },
+  // Pairing a station screen or customer display with its code alone — no
+  // session (index.ts turns the device's key in the answer into a cookie).
+  {
+    pattern: /^\/api\/public\/pair$/,
+    service: 'ARCANUM_BACKEND_SERVICE',
+    requireAuth: false,
+    rewritePath: { from: '/api/public', to: '/public' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
   },
   // Self-ordering guests (DOMAIN_MODEL.md "Self-ordering and station
@@ -85,6 +100,10 @@ export function isKnownApiRoute(pathname: string): boolean {
 // Router is constructed — so it needs to know a route's requireAuth without
 // dispatching. Defaults to true (safe default) for anything unmatched; in
 // practice isKnownApiRoute already rejects unmatched /api paths earlier.
+export function routeAllowsDevice(pathname: string): boolean {
+  return !!ROUTES.find((r) => r.pattern.test(pathname))?.allowDevice;
+}
+
 export function routeRequiresAuth(pathname: string): boolean {
   const route = ROUTES.find((r) => r.pattern.test(pathname));
   return route ? route.requireAuth : true;
@@ -116,6 +135,7 @@ export class Router {
 
     return this.proxy.forward(request, service, {
       requireAuth: route.requireAuth,
+      allowDevice: route.allowDevice,
       rewritePath: route.rewritePath ?? null,
       local_url: localUrl,
       debug: this.env.FRONTEND_URL?.includes('localhost'),
