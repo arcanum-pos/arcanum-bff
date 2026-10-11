@@ -48,6 +48,18 @@ const ROUTES: RouteDefinition[] = [
     rewritePath: { from: '/api/organizations', to: '/organizations' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
   },
+  // Self-ordering guests (DOMAIN_MODEL.md "Self-ordering and station
+  // screens"): an event's menu, placing an order, following it. Public — a
+  // guest who scanned a QR code has no account. Identity headers are still
+  // cleared (setIdentityHeaders); the backend checks the event's code / the
+  // order's token, and bounds what an order can be.
+  {
+    pattern: /^\/api\/public\/(self-order\/[^/]+(\/orders)?|orders\/[^/]+)$/,
+    service: 'ARCANUM_BACKEND_SERVICE',
+    requireAuth: false,
+    rewritePath: { from: '/api/public', to: '/public' },
+    localUrlEnv: 'BANCONTACT_LOCAL_URL',
+  },
   // Payment-provider webhook callbacks (Bancontact, SumUp). Deliberately
   // unauthenticated — the provider calling this has no Auth0 session/bearer
   // token to present — but still routed through this proxy rather than

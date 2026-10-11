@@ -144,7 +144,22 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // devicehub's own connect handler does the token verification and DO
     // upgrade; this is a pure byte-forwarding hop, not a proxy that needs to
     // understand the protocol.
-    if (path === '/devices/connect') {
+    // Self-ordering guests' pages — public by design (a guest has no
+    // account): /bestel/<event code> (menu → cart → pay → confirmation) and
+    // /volg/<order token> (follow an order). arcanum-frontends' selforder.html.
+    if (path.startsWith('/bestel/') || path.startsWith('/volg/')) {
+      const selfOrderProxy = new UIFrontendProxy(env, {
+        service: env.ARCANUM_FRONTENDS_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/selforder.html',
+      });
+      return selfOrderProxy.handleRequest(request, '/selforder.html');
+    }
+
+    // A follow page's live updates: arcanum-devicehub's order hub. Like
+    // /devices/connect below, a pure forwarding hop — the socket's own
+    // short-lived ticket (from /api/public/orders/<token>) does the work.
+    if (path === '/devices/connect' || path === '/orders/connect') {
       const isDevelopment = env.FRONTEND_URL?.includes('localhost') || env.FRONTEND_URL?.includes('127.0.0.1');
       // The socket's own short-lived token does the work: no session cookie along.
       const forward = (target: string) => {
@@ -265,7 +280,7 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // which asks again what this device is.
     if (path === '/simulator.html') return Response.redirect(new URL('/', request.url).toString(), 302);
 
-    if (path === '/display.html' || path === '/kassa.html' || path === '/settings.html') {
+    if (path === '/display.html' || path === '/kassa.html' || path === '/settings.html' || path === '/station.html') {
       const movedScreenProxy = new UIFrontendProxy(env, {
         service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
