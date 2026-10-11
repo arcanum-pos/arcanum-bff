@@ -49,12 +49,13 @@ const ROUTES: RouteDefinition[] = [
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
   },
   // Self-ordering guests (DOMAIN_MODEL.md "Self-ordering and station
-  // screens"): an event's menu, placing an order, following it. Public — a
+  // screens"): an event's menu, placing an order, following it, paying it,
+  // a number for its "ready" SMS (MESSAGING.md). Public — a
   // guest who scanned a QR code has no account. Identity headers are still
   // cleared (setIdentityHeaders); the backend checks the event's code / the
   // order's token, and bounds what an order can be.
   {
-    pattern: /^\/api\/public\/(self-order\/[^/]+(\/orders)?|orders\/[^/]+(\/bancontact|\/orders)?)$/,
+    pattern: /^\/api\/public\/(self-order\/[^/]+(\/orders)?|orders\/[^/]+(\/bancontact|\/orders|\/notify)?)$/,
     service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: false,
     rewritePath: { from: '/api/public', to: '/public' },

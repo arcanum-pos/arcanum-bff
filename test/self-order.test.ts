@@ -35,6 +35,11 @@ describe('self-ordering without a session', () => {
     expect(((await pay.json()) as { path: string }).path).toBe('/public/orders/a-token/bancontact');
     const round = await call('/api/public/orders/a-token/orders', { method: 'POST', headers: { Origin: BASE }, body: '{}' });
     expect(((await round.json()) as { path: string }).path).toBe('/public/orders/a-token/orders');
+    // A number for the "ready" SMS, and taking it back.
+    const notify = await call('/api/public/orders/a-token/notify', { method: 'POST', headers: { Origin: BASE }, body: '{}' });
+    expect(((await notify.json()) as { path: string }).path).toBe('/public/orders/a-token/notify');
+    const unnotify = await call('/api/public/orders/a-token/notify', { method: 'DELETE', headers: { Origin: BASE } });
+    expect(((await unnotify.json()) as { path: string; method?: string }).path).toBe('/public/orders/a-token/notify');
   });
 
   it('only those public routes: anything else under /api/public is unknown, and orders only from this site', async () => {
