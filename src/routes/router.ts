@@ -70,7 +70,8 @@ const ROUTES: RouteDefinition[] = [
   // cleared (setIdentityHeaders); the backend checks the event's code / the
   // order's token, and bounds what an order can be.
   {
-    pattern: /^\/api\/public\/(self-order\/[^/]+(\/orders)?|orders\/[^/]+(\/bancontact|\/orders|\/notify)?)$/,
+    // …and a table's QR (release C): which table, and its tab to order on.
+    pattern: /^\/api\/public\/(self-order\/[^/]+(\/orders)?|orders\/[^/]+(\/bancontact|\/orders|\/notify)?|tables\/[^/]+)$/,
     service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: false,
     rewritePath: { from: '/api/public', to: '/public' },

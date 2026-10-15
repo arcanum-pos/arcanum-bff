@@ -147,7 +147,9 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // Self-ordering guests' pages — public by design (a guest has no
     // account): /bestel/<event code> (menu → cart → pay → confirmation) and
     // /volg/<order token> (follow an order). arcanum-frontends' selforder.html.
-    if (path.startsWith('/bestel/') || path.startsWith('/volg/')) {
+    // /tafel/<QR token>: a table's QR code (release C) — a guest orders on
+    // the table's tab, a signed-in waiter is sent on to /bediening.
+    if (path.startsWith('/bestel/') || path.startsWith('/volg/') || path.startsWith('/tafel/')) {
       const selfOrderProxy = new UIFrontendProxy(env, {
         service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
@@ -302,6 +304,16 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // replaces it): a browser that still opens it goes back to the chooser,
     // which asks again what this device is.
     if (path === '/simulator.html') return Response.redirect(new URL('/', request.url).toString(), 302);
+
+    // The waiter screen (release C): signed in, like any page above.
+    if (path === '/bediening' || path === '/bediening/') {
+      const waiterProxy = new UIFrontendProxy(env, {
+        service: env.ARCANUM_FRONTENDS_SERVICE,
+        localUrl: env.CONSOLE_LOCAL_URL,
+        fallbackFile: '/waiter.html',
+      });
+      return waiterProxy.handleRequest(request, '/waiter.html');
+    }
 
     if (path === '/display.html' || path === '/kassa.html' || path === '/settings.html' || path === '/station.html') {
       const movedScreenProxy = new UIFrontendProxy(env, {

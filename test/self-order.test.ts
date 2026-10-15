@@ -14,7 +14,7 @@ function call(path: string, init: RequestInit = {}): Promise<Response> {
 
 describe('self-ordering without a session', () => {
   it('serves the guest pages (/bestel/…, /volg/…) — not the login prompt', async () => {
-    for (const path of ['/bestel/abcdefghijklmnopqrstuvwxyz012345', '/volg/abcdefghijklmnopqrstuvwx']) {
+    for (const path of ['/bestel/abcdefghijklmnopqrstuvwxyz012345', '/volg/abcdefghijklmnopqrstuvwx', '/tafel/abcdefghjkmnpqrstuvw']) {
       const res = await call(path, { headers: { Accept: 'text/html' } });
       expect(res.status, path).toBe(200);
       expect(await res.text()).toBe('<html>frontends /selforder.html</html>');
@@ -29,6 +29,8 @@ describe('self-ordering without a session', () => {
     expect(body.headers['x-user-sub']).toBeUndefined();
     expect(body.headers['x-user-issuer']).toBeUndefined();
     expect(((await (await call('/api/public/orders/a-token')).json()) as { path: string }).path).toBe('/public/orders/a-token');
+    // A table's QR (release C).
+    expect(((await (await call('/api/public/tables/a-token')).json()) as { path: string }).path).toBe('/public/tables/a-token');
     const placed = await call('/api/public/self-order/the-code/orders', { method: 'POST', headers: { Origin: BASE, 'Content-Type': 'application/json' }, body: '{}' });
     expect(((await placed.json()) as { path: string }).path).toBe('/public/self-order/the-code/orders');
     const pay = await call('/api/public/orders/a-token/bancontact', { method: 'POST', headers: { Origin: BASE } });
@@ -45,6 +47,9 @@ describe('self-ordering without a session', () => {
   it('only those public routes: anything else under /api/public is unknown, and orders only from this site', async () => {
     expect((await call('/api/public/organizations')).status).toBe(404);
     expect((await call('/api/public/self-order/x/y/z')).status).toBe(404);
+    expect((await call('/api/public/tables/x/seat')).status).toBe(404);
+    // The waiter screen is for the signed-in.
+    expect((await call('/bediening', { headers: { Accept: 'text/html' } })).status).toBe(401);
     expect((await call('/api/public/self-order/the-code/orders', { method: 'POST', headers: { Origin: 'https://evil.test' }, body: '{}' })).status).toBe(403);
     // The signed-in API stays signed-in.
     expect((await call('/api/organizations/x/tabs')).status).toBe(401);
