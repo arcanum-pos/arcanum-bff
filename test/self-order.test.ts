@@ -42,6 +42,19 @@ describe('self-ordering without a session', () => {
     expect(((await notify.json()) as { path: string }).path).toBe('/public/orders/a-token/notify');
     const unnotify = await call('/api/public/orders/a-token/notify', { method: 'DELETE', headers: { Origin: BASE } });
     expect(((await unnotify.json()) as { path: string; method?: string }).path).toBe('/public/orders/a-token/notify');
+    // A browser for "ready" notifications (Web Push, release G').
+    const push = await call('/api/public/orders/a-token/push', { method: 'POST', headers: { Origin: BASE }, body: '{}' });
+    expect(((await push.json()) as { path: string }).path).toBe('/public/orders/a-token/push');
+  });
+
+  it("Web Push: the follow page's service worker, and a manifest that opens that order (iPhone home screen)", async () => {
+    const sw = await call('/push-sw.js');
+    expect(sw.status).toBe(200);
+    expect(await sw.text()).toContain('/push-sw.js');
+    const res = await call('/volg/abcdefghijklmnopqrstuvwx/manifest.webmanifest');
+    expect(res.headers.get('Content-Type')).toBe('application/manifest+json');
+    expect(await res.json()).toMatchObject({ start_url: '/volg/abcdefghijklmnopqrstuvwx', scope: '/volg/abcdefghijklmnopqrstuvwx', display: 'standalone' });
+    expect((await call('/volg/short/manifest.webmanifest', { headers: { Accept: 'text/html' } })).headers.get('Content-Type')).not.toBe('application/manifest+json');
   });
 
   it('only those public routes: anything else under /api/public is unknown, and orders only from this site', async () => {

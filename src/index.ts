@@ -149,6 +149,17 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // /volg/<order token> (follow an order). arcanum-frontends' selforder.html.
     // /tafel/<QR token>: a table's QR code (release C) — a guest orders on
     // the table's tab, a signed-in waiter is sent on to /bediening.
+    // Web Push (release G'): a follow page added to an iPhone's home screen
+    // opens that order — its own manifest, made here (nothing secret: the
+    // token is in the address already). iOS only allows Web Push from there.
+    const manifestMatch = path.match(/^\/volg\/([A-Za-z0-9_-]{20,64})\/manifest\.webmanifest$/);
+    if (manifestMatch) return orderManifest(manifestMatch[1]);
+    // The follow page's service worker (shows the notification): public,
+    // from arcanum-frontends' public/.
+    if (path === '/push-sw.js') {
+      const swProxy = new UIFrontendProxy(env, { service: env.ARCANUM_FRONTENDS_SERVICE, localUrl: env.CONSOLE_LOCAL_URL, fallbackFile: '/push-sw.js' });
+      return swProxy.handleRequest(request, '/push-sw.js');
+    }
     if (path.startsWith('/bestel/') || path.startsWith('/volg/') || path.startsWith('/tafel/')) {
       const selfOrderProxy = new UIFrontendProxy(env, {
         service: env.ARCANUM_FRONTENDS_SERVICE,
@@ -400,6 +411,26 @@ function isScannedPath(path: string): boolean {
   const extMatch = path.match(/\.([a-zA-Z0-9]+)$/);
   if (!extMatch) return false;
   const ext = extMatch[1].toLowerCase();
-  const ALLOWED = new Set(['html', 'js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'woff', 'woff2', 'ttf', 'eot', 'map']);
+  const ALLOWED = new Set(['html', 'js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'woff', 'woff2', 'ttf', 'eot', 'map', 'webmanifest']);
   return !ALLOWED.has(ext);
+}
+
+// A follow page's web app manifest (see the route above): opens that order,
+// standalone. The page sets the shown name (apple-mobile-web-app-title).
+export function orderManifest(token: string): Response {
+  const start = `/volg/${token}`;
+  return new Response(
+    JSON.stringify({
+      name: 'Bestelling',
+      short_name: 'Bestelling',
+      start_url: start,
+      scope: start,
+      id: start,
+      display: 'standalone',
+      background_color: '#ffffff',
+      theme_color: '#ffffff',
+      icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }],
+    }),
+    { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' } }
+  );
 }
