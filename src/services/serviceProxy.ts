@@ -102,7 +102,9 @@ export class ServiceProxy {
         duplex: 'half',
       } as RequestInit);
 
-      return response;
+      // Changeable headers for whoever adds its own (fetch's are read-only
+      // in Node — and in a Worker too).
+      return new Response(response.body, response);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('HTTP forwarding error:', error);

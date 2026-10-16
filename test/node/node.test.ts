@@ -67,6 +67,8 @@ describe('a service binding as HTTP', () => {
     const url = await listen(server);
     const res = await httpFetcher(url).fetch('https://backend/organizations/o1/tabs?x=1', { method: 'POST', headers: { 'X-User-Sub': 'u1' }, body: '{"a":1}' });
     expect(await res.text()).toBe('ok');
+    // Changeable, like a service binding's answer (the bff adds headers to it).
+    expect(() => res.headers.set('X-Added', '1')).not.toThrow();
     expect(seen).toEqual({ url: '/organizations/o1/tabs?x=1', method: 'POST', header: 'u1', body: '{"a":1}' });
     server.close();
   });
@@ -93,6 +95,7 @@ describe('the whole bff on Node', () => {
     });
     servers.push(backend, frontends, devicehub);
     const [b, f, d] = await Promise.all([listen(backend), listen(frontends), listen(devicehub)]);
+    Object.assign(process.env, { TEST_BACKEND_URL: b, TEST_FRONTENDS_URL: f, TEST_DEVICEHUB_URL: d });
     const server = start({
       PORT: '0',
       BACKEND_URL: b,
@@ -109,6 +112,12 @@ describe('the whole bff on Node', () => {
   afterAll(() => {
     stop();
     servers.forEach((s) => s.close());
+  });
+
+  it('an authenticated API call answered by the backend (its answer gets the bff\'s headers)', async () => {
+    const res = await fetch(`${bff}/api/public/tables/qr-1`, { headers: { Origin: 'https://arcanum.test' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ backend: '/public/tables/qr-1', sub: null });
   });
 
   it('the public API to the backend, with no identity — even one a client made up', async () => {
@@ -137,6 +146,22 @@ describe('the whole bff on Node', () => {
     expect(echo.toString()).toBe('ping');
     expect(devicehubSaw).toEqual(['/devices/connect?token=t1 cookie=- auth=-']);
     socket.destroy();
+  });
+
+  it('on a localhost address too (its local-development path): the backend\'s answer comes through', async () => {
+    const local = start({
+      PORT: '0',
+      BACKEND_URL: process.env.TEST_BACKEND_URL!,
+      FRONTENDS_URL: process.env.TEST_FRONTENDS_URL!,
+      DEVICEHUB_URL: process.env.TEST_DEVICEHUB_URL!,
+      SESSIONS_DB: path.join(dir, 'local.db'),
+      FRONTEND_URL: 'http://localhost:9',
+      BFF_INTERNAL_KEY: 'test-bff-key',
+    });
+    await once(local, 'listening');
+    const res = await fetch(`http://127.0.0.1:${(local.address() as net.AddressInfo).port}/api/public/self-order/the-code`);
+    expect(await res.json()).toEqual({ backend: '/public/self-order/the-code', sub: null });
+    local.close();
   });
 
   it('any other upgrade: refused', async () => {
