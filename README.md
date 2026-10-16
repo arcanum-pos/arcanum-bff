@@ -200,7 +200,7 @@ installation points its users to that source.
 ## Self-hosted (SELF_HOSTING.md)
 
 The same Worker code runs on Node (`src/node.ts`): `npm run build:node`,
-then `node dist/node.js` with the Worker's vars and secrets as environment
+then `node dist/node.mjs` with the Worker's vars and secrets as environment
 variables, plus `BACKEND_URL`, `DEVICEHUB_URL`, `FRONTENDS_URL` (and
 `INSTALLER_URL`), `SESSIONS_DB` and `PORT`. The bindings are Cloudflare-shaped
 stand-ins (`src/node/`): sessions in a SQLite file (one bff replica), the
