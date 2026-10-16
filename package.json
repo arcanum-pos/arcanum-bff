@@ -13,7 +13,7 @@
     "kv:list": "wrangler kv:key list --binding=ARCANUM_SESSIONS",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:node": "esbuild src/node-main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/node.js",
+    "build:node": "esbuild src/node-main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/node.js --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
     "start:node": "node dist/node.js"
   },
   "devDependencies": {

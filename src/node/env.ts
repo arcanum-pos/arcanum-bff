@@ -31,6 +31,12 @@ export function nodeEnv(env: NodeJS.ProcessEnv): { env: Env; sessions: SqliteKV 
       ARCANUM_DEVICEHUB_SERVICE: httpFetcher(required(env, 'DEVICEHUB_URL')) as unknown as Fetcher,
       ARCANUM_FRONTENDS_SERVICE: httpFetcher(required(env, 'FRONTENDS_URL')) as unknown as Fetcher,
       ...(env.INSTALLER_URL ? { ARCANUM_INSTALLER_SERVICE: httpFetcher(env.INSTALLER_URL) as unknown as Fetcher } : {}),
+      // On a localhost address the bff takes its local-development path
+      // (the *_LOCAL_URL settings): the same Services, so testing on one's
+      // own machine works too.
+      CONSOLE_LOCAL_URL: env.CONSOLE_LOCAL_URL || required(env, 'FRONTENDS_URL'),
+      BANCONTACT_LOCAL_URL: env.BANCONTACT_LOCAL_URL || required(env, 'BACKEND_URL'),
+      DEVICEHUB_LOCAL_URL: env.DEVICEHUB_LOCAL_URL || required(env, 'DEVICEHUB_URL'),
       SESSION_TTL: Number(env.SESSION_TTL || 604800),
       FRONTEND_URL: required(env, 'FRONTEND_URL'),
       BFF_INTERNAL_KEY: required(env, 'BFF_INTERNAL_KEY'),
