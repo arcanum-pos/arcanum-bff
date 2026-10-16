@@ -49,40 +49,52 @@ async function backend(request: Request) {
   return Response.json({ echo: true, path: url.pathname, search: url.search, headers: Object.fromEntries(request.headers) });
 }
 
+// Two projects (SELF_HOSTING.md): the Worker in the Workers runtime as on
+// Cloudflare, and the self-hosted pieces (src/node/, src/node.ts) on Node.
 export default defineConfig({
-  plugins: [
-    cloudflareTest({
-      wrangler: { configPath: './wrangler.jsonc' },
-      miniflare: {
-        bindings: {
-          // Test-only values. A developer's .dev.vars may point FRONTEND_URL
-          // at localhost (= the HTTP dev path); pin production behaviour.
-          FRONTEND_URL: 'https://arcanum.test',
-          CONSOLE_LOCAL_URL: '',
-          DEVICEHUB_LOCAL_URL: '',
-          BANCONTACT_LOCAL_URL: '',
-          BFF_INTERNAL_KEY: 'test-bff-key',
-          // The instance's login provider (bff/idp.ts): the browser's client,
-          // and a separate QR (device grant) client (as for Google).
-          DEFAULT_IDP_ISSUER_URL: 'https://login.test',
-          DEFAULT_IDP_CLIENT_ID: 'authcode-client',
-          DEFAULT_IDP_CLIENT_SECRET: 'authcode-secret',
-          DEFAULT_IDP_DEVICE_CLIENT_ID: 'device-client',
-          DEFAULT_IDP_DEVICE_CLIENT_SECRET: 'device-secret',
-          INSTALLER_INTERNAL_KEY: 'test-installer-key',
-        },
-        // The provider's discovery document (bff/idp.ts fetches it); nothing else leaves.
-        outboundService: (request: Request) =>
-          new URL(request.url).href === 'https://login.test/.well-known/openid-configuration'
-            ? Response.json({ issuer: IDP.issuerUrl, ...IDP.endpoints })
-            : new Response('no outbound in tests', { status: 502 }),
-        serviceBindings: {
-          ARCANUM_BACKEND_SERVICE: backend,
-          ARCANUM_DEVICEHUB_SERVICE: unused,
-          ARCANUM_FRONTENDS_SERVICE: frontends,
-          ARCANUM_INSTALLER_SERVICE: echoInstaller,
-        },
+  test: {
+    projects: [
+      {
+      plugins: [
+        cloudflareTest({
+          wrangler: { configPath: './wrangler.jsonc' },
+          miniflare: {
+            bindings: {
+              // Test-only values. A developer's .dev.vars may point FRONTEND_URL
+              // at localhost (= the HTTP dev path); pin production behaviour.
+              FRONTEND_URL: 'https://arcanum.test',
+              CONSOLE_LOCAL_URL: '',
+              DEVICEHUB_LOCAL_URL: '',
+              BANCONTACT_LOCAL_URL: '',
+              BFF_INTERNAL_KEY: 'test-bff-key',
+              // The instance's login provider (bff/idp.ts): the browser's client,
+              // and a separate QR (device grant) client (as for Google).
+              DEFAULT_IDP_ISSUER_URL: 'https://login.test',
+              DEFAULT_IDP_CLIENT_ID: 'authcode-client',
+              DEFAULT_IDP_CLIENT_SECRET: 'authcode-secret',
+              DEFAULT_IDP_DEVICE_CLIENT_ID: 'device-client',
+              DEFAULT_IDP_DEVICE_CLIENT_SECRET: 'device-secret',
+              INSTALLER_INTERNAL_KEY: 'test-installer-key',
+            },
+            // The provider's discovery document (bff/idp.ts fetches it); nothing else leaves.
+            outboundService: (request: Request) =>
+              new URL(request.url).href === 'https://login.test/.well-known/openid-configuration'
+                ? Response.json({ issuer: IDP.issuerUrl, ...IDP.endpoints })
+                : new Response('no outbound in tests', { status: 502 }),
+            serviceBindings: {
+              ARCANUM_BACKEND_SERVICE: backend,
+              ARCANUM_DEVICEHUB_SERVICE: unused,
+              ARCANUM_FRONTENDS_SERVICE: frontends,
+              ARCANUM_INSTALLER_SERVICE: echoInstaller,
+            },
+          },
+        }),
+      ],
+        test: { name: 'cloudflare', include: ['test/*.test.ts'] },
       },
-    }),
-  ],
+      {
+        test: { name: 'node', environment: 'node', include: ['test/node/*.test.ts'] },
+      },
+    ],
+  },
 });

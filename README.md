@@ -196,3 +196,15 @@ hosting or support — but if you run a modified version for users over a
 network, you must offer those users its source code (AGPL §13). The app's
 "Broncode" link (the `SOURCE_URL` setting of arcanum-bff) is how an
 installation points its users to that source.
+
+## Self-hosted (SELF_HOSTING.md)
+
+The same Worker code runs on Node (`src/node.ts`): `npm run build:node`,
+then `node dist/node.js` with the Worker's vars and secrets as environment
+variables, plus `BACKEND_URL`, `DEVICEHUB_URL`, `FRONTENDS_URL` (and
+`INSTALLER_URL`), `SESSIONS_DB` and `PORT`. The bindings are Cloudflare-shaped
+stand-ins (`src/node/`): sessions in a SQLite file (one bff replica), the
+login rate limit in memory, each service binding plain HTTP. WebSocket
+upgrades for `/devices/connect` and `/orders/connect` go straight to
+devicehub, without cookie or Authorization. `npm test` runs the Worker tests
+in the Workers runtime and `test/node/` on Node.
