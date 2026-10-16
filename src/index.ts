@@ -154,6 +154,15 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // token is in the address already). iOS only allows Web Push from there.
     const manifestMatch = path.match(/^\/volg\/([A-Za-z0-9_-]{20,64})\/manifest\.webmanifest$/);
     if (manifestMatch) return orderManifest(manifestMatch[1]);
+    // A kassa's Tap to Pay phone (and the kassa's QR for a payment): public —
+    // the page holds no data; the phone's calls carry its key, the QR's its
+    // payment's own token. Paired from the page itself: on an iPhone, the
+    // home-screen app keeps its own cookies, apart from Safari's.
+    if (path === '/tap/manifest.webmanifest') return appManifest('/tap', 'Tap to Pay');
+    if (path === '/tap') {
+      const tapProxy = new UIFrontendProxy(env, { service: env.ARCANUM_FRONTENDS_SERVICE, localUrl: env.CONSOLE_LOCAL_URL, fallbackFile: '/tap.html' });
+      return tapProxy.handleRequest(request, '/tap.html');
+    }
     // The follow page's service worker (shows the notification): public,
     // from arcanum-frontends' public/.
     if (path === '/push-sw.js') {
@@ -418,11 +427,14 @@ function isScannedPath(path: string): boolean {
 // A follow page's web app manifest (see the route above): opens that order,
 // standalone. The page sets the shown name (apple-mobile-web-app-title).
 export function orderManifest(token: string): Response {
-  const start = `/volg/${token}`;
+  return appManifest(`/volg/${token}`, 'Bestelling');
+}
+
+export function appManifest(start: string, name: string): Response {
   return new Response(
     JSON.stringify({
-      name: 'Bestelling',
-      short_name: 'Bestelling',
+      name,
+      short_name: name,
       start_url: start,
       scope: start,
       id: start,

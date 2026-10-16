@@ -57,6 +57,19 @@ describe('self-ordering without a session', () => {
     expect((await call('/volg/short/manifest.webmanifest', { headers: { Accept: 'text/html' } })).headers.get('Content-Type')).not.toBe('application/manifest+json');
   });
 
+  it("a kassa's Tap to Pay phone: its page and manifest, and a payment's QR link — public; nothing more", async () => {
+    const page = await call('/tap', { headers: { Accept: 'text/html' } });
+    expect(page.status).toBe(200);
+    expect(await page.text()).toBe('<html>frontends /tap.html</html>');
+    expect(await (await call('/tap/manifest.webmanifest')).json()).toMatchObject({ start_url: '/tap', scope: '/tap', display: 'standalone', name: 'Tap to Pay' });
+    const charge = await call('/api/public/tap/charge-1/token-1', { headers: { 'X-User-Sub': 'forged' } });
+    expect(((await charge.json()) as { path: string }).path).toBe('/public/tap/charge-1/token-1');
+    const back = await call('/api/public/tap/charge-1/token-1/return', { method: 'POST', headers: { Origin: BASE }, body: '{}' });
+    expect(((await back.json()) as { path: string }).path).toBe('/public/tap/charge-1/token-1/return');
+    expect((await call('/api/public/tap/charge-1')).status).toBe(404);
+    expect((await call('/api/public/tap/a/b/c')).status).toBe(404);
+  });
+
   it('only those public routes: anything else under /api/public is unknown, and orders only from this site', async () => {
     expect((await call('/api/public/organizations')).status).toBe(404);
     expect((await call('/api/public/self-order/x/y/z')).status).toBe(404);
