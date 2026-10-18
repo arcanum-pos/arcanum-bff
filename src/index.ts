@@ -181,8 +181,10 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // Pairing a station screen or customer display with its code alone (no
     // account needed): arcanum-frontends' pair.html. A kassa's code sends
     // the person on to sign in first.
-    // The console's pairing link carries the device (role, name): its own
-    // manifest, so an app installed from it is that device (the page links it).
+    // The console's pairing link carries the device (role, name): the page
+    // comes with that device's icon, name and manifest in its HTML (Safari's
+    // Add to Dock reads what was sent, not what a script changed), so an app
+    // installed from it is that device.
     if (path === '/pair/manifest.webmanifest') return deviceManifest(url.searchParams);
     if (path === '/pair') {
       const pairProxy = new UIFrontendProxy(env, {
@@ -190,7 +192,7 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
         localUrl: env.CONSOLE_LOCAL_URL,
         fallbackFile: '/pair.html',
       });
-      return pairProxy.handleRequest(request, '/pair.html');
+      return asDevice(await pairProxy.handleRequest(request, '/pair.html'), url.searchParams);
     }
 
     // A follow page's live updates: arcanum-devicehub's order hub. Like
@@ -445,9 +447,38 @@ export function orderManifest(token: string): Response {
 // itself, which opens the screen once paired; the scope the whole site.
 const DEVICE_ICONS: Record<string, [icon: string, name: string]> = { pos: ['kassa', 'Kassa'], cfd: ['display', 'Klantscherm'], station: ['station', 'Station'] };
 
+function linkedDevice(params: URLSearchParams): { role: string; icon: string; name: string } | null {
+  const role = params.get('role') ?? '';
+  const known = DEVICE_ICONS[role];
+  if (!known) return null;
+  return { role, icon: known[0], name: (params.get('name') ?? '').trim().slice(0, 60) || known[1] };
+}
+
+const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// pair.html with the linked device's head: icon, home-screen icon, manifest,
+// name under the icon, title (arcanum-frontends' pair.html has each of these
+// once — its scripts/app-icons.test.ts checks the links).
+export async function asDevice(page: Response, params: URLSearchParams): Promise<Response> {
+  const device = linkedDevice(params);
+  if (!device || !page.ok || !(page.headers.get('Content-Type') ?? '').includes('text/html')) return page;
+  const name = escapeHtml(device.name);
+  const manifest = escapeHtml(`/pair/manifest.webmanifest?${new URLSearchParams({ role: device.role, name: device.name })}`);
+  const html = (await page.text())
+    .replace(/(<link rel="icon"[^>]*href=")[^"]*/, `$1/icons/${device.icon}-96.png`)
+    .replace(/(<link rel="apple-touch-icon"[^>]*href=")[^"]*/, `$1/icons/${device.icon}-180.png`)
+    .replace(/(<link rel="manifest"[^>]*href=")[^"]*/, `$1${manifest}`)
+    .replace(/(<meta name="apple-mobile-web-app-title"[^>]*content=")[^"]*/, () => `<meta name="apple-mobile-web-app-title" content="${name}`)
+    .replace(/<title>[^<]*<\/title>/, () => `<title>${name}</title>`);
+  const headers = new Headers(page.headers);
+  headers.delete('Content-Length');
+  return new Response(html, { status: page.status, headers });
+}
+
 export function deviceManifest(params: URLSearchParams): Response {
-  const [icon, fallback] = DEVICE_ICONS[params.get('role') ?? ''] ?? ['arcanum', 'Arcanum'];
-  const name = (params.get('name') ?? '').trim().slice(0, 60) || fallback;
+  const device = linkedDevice(params);
+  const icon = device?.icon ?? 'arcanum';
+  const name = device?.name ?? ((params.get('name') ?? '').trim().slice(0, 60) || 'Arcanum');
   return new Response(
     JSON.stringify({
       name,

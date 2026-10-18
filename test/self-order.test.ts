@@ -3,7 +3,7 @@
 // session — and nothing else opens up with them.
 import { env } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
-import worker from '../src/index';
+import worker, { asDevice } from '../src/index';
 
 const BASE = 'https://arcanum.test';
 
@@ -99,6 +99,35 @@ describe('self-ordering without a session', () => {
 });
 
 describe('app icons', () => {
+  // The head of arcanum-frontends' pair.html, as built.
+  const PAIR_HTML = `<!doctype html><html lang="nl"><head><meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icons/arcanum-96.png" />
+    <link rel="apple-touch-icon" href="/icons/arcanum-180.png" />
+    <link rel="manifest" href="/icons/arcanum.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="Arcanum" />
+    <title>Toestel koppelen</title></head><body></body></html>`;
+  const page = () => new Response(PAIR_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': String(PAIR_HTML.length) } });
+
+  it("a pairing link's page comes with that device's icon, name and manifest in its HTML (Safari's Add to Dock reads only that)", async () => {
+    const res = await asDevice(page(), new URLSearchParams({ code: 'K7PM4XQ2', role: 'pos', name: 'Kassa "1" <b>' }));
+    const html = await res.text();
+    expect(html).toContain('<link rel="icon" type="image/png" sizes="96x96" href="/icons/kassa-96.png" />');
+    expect(html).toContain('<link rel="apple-touch-icon" href="/icons/kassa-180.png" />');
+    expect(html).toContain('<link rel="manifest" href="/pair/manifest.webmanifest?role=pos&amp;name=Kassa+%221%22+%3Cb%3E" />');
+    expect(html).toContain('<meta name="apple-mobile-web-app-title" content="Kassa &quot;1&quot; &lt;b&gt;" />');
+    expect(html).toContain('<title>Kassa &quot;1&quot; &lt;b&gt;</title>');
+    expect(res.headers.get('Content-Length')).toBeNull();
+    // No device in the link (typed, an older QR): the page as it is.
+    expect(await (await asDevice(page(), new URLSearchParams({ code: 'K7PM4XQ2' }))).text()).toBe(PAIR_HTML);
+    expect(await (await asDevice(page(), new URLSearchParams({ role: 'admin' }))).text()).toBe(PAIR_HTML);
+  });
+
+  it('/pair is served through it, without a session', async () => {
+    const res = await call('/pair?code=K7PM4XQ2&role=pos&name=Kassa%201', { headers: { Accept: 'text/html' } });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('<html>frontends /pair.html</html>');
+  });
+
   it("a pairing link's manifest: that device's name and icon, without a session — the name only as data", async () => {
     const res = await call('/pair/manifest.webmanifest?role=pos&name=Kassa%201');
     expect(res.headers.get('Content-Type')).toBe('application/manifest+json');
