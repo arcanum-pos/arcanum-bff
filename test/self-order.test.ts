@@ -56,6 +56,9 @@ describe('self-ordering without a session', () => {
     const manifest = (await res.json()) as { icons: { src: string }[] };
     expect(manifest).toMatchObject({ start_url: '/volg/abcdefghijklmnopqrstuvwx', scope: '/', display: 'standalone' });
     expect(manifest.icons.map((i) => i.src)).toContain('/icons/selforder-512.png');
+    // The organisation's own icon, when the page knows it.
+    const own = (await (await call('/volg/abcdefghijklmnopqrstuvwx/manifest.webmanifest?icon=org-1/selforder')).json()) as { icons: { src: string }[] };
+    expect(own.icons[0].src).toBe('/icons/org/org-1/selforder-192.png');
     expect((await call('/volg/short/manifest.webmanifest', { headers: { Accept: 'text/html' } })).headers.get('Content-Type')).not.toBe('application/manifest+json');
   });
 
@@ -120,6 +123,43 @@ describe('app icons', () => {
     // No device in the link (typed, an older QR): the page as it is.
     expect(await (await asDevice(page(), new URLSearchParams({ code: 'K7PM4XQ2' }))).text()).toBe(PAIR_HTML);
     expect(await (await asDevice(page(), new URLSearchParams({ role: 'admin' }))).text()).toBe(PAIR_HTML);
+  });
+
+  it("an organisation's own icons: its own when it has one, else the default — without a session", async () => {
+    const own = await call('/icons/org/org-own/kassa-180.png');
+    expect(own.status).toBe(200);
+    expect(await own.text()).toBe('own /public/icons/org-own/kassa/180');
+    expect(own.headers.get('Cache-Control')).toBe('public, max-age=300');
+    // None of its own: the default set's file (a prep station's: the station's).
+    expect(await (await call('/icons/org/org-plain/display-512.png')).text()).toBe('<html>frontends /icons/display-512.png</html>');
+    expect(await (await call('/icons/org/org-plain/station-st_1-96.png')).text()).toBe('<html>frontends /icons/station-96.png</html>');
+    expect(await (await call('/icons/org/org-plain/pickup-192.png')).text()).toBe('<html>frontends /icons/station-192.png</html>');
+    // Not a page that takes an icon, or a size that isn't made.
+    expect((await call('/icons/org/org-own/console-180.png')).status).toBe(404);
+    expect((await call('/icons/org/org-own/kassa-64.png')).status).toBe(404);
+    const manifest = (await (await call('/icons/org/org-own/station-st_1.webmanifest?name=Keuken')).json()) as { name: string; scope: string; start_url?: string; icons: { src: string; purpose: string }[] };
+    expect(manifest).toMatchObject({ name: 'Keuken', scope: '/', display: 'standalone' });
+    expect(manifest.start_url).toBeUndefined();
+    expect(manifest.icons).toEqual([
+      { src: '/icons/org/org-own/station-st_1-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icons/org/org-own/station-st_1-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    ]);
+    expect(((await (await call('/icons/org/org-own/waiter.webmanifest')).json()) as { name: string }).name).toBe('Bediening');
+  });
+
+  it("a pairing link with the org's icon (`icon=<org>/<slot>`): the page is sent with that organisation's icons", async () => {
+    const html = await (await asDevice(page(), new URLSearchParams({ code: 'K7PM4XQ2', role: 'station', name: 'Keuken', icon: 'org-1/station-st_1' }))).text();
+    expect(html).toContain('href="/icons/org/org-1/station-st_1-96.png"');
+    expect(html).toContain('<link rel="apple-touch-icon" href="/icons/org/org-1/station-st_1-180.png" />');
+    expect(html).toContain('<link rel="manifest" href="/icons/org/org-1/station-st_1.webmanifest?name=Keuken" />');
+    // A made-up one: the default set.
+    expect(await (await asDevice(page(), new URLSearchParams({ role: 'station', name: 'Keuken', icon: 'org-1/../x' }))).text()).toContain('href="/icons/station-180.png"');
+  });
+
+  it("a Tap to Pay phone's link with the org's icon: its page and manifest", async () => {
+    const manifest = (await (await call('/tap/manifest.webmanifest?icon=org-1/tap')).json()) as { start_url: string; icons: { src: string }[] };
+    expect(manifest.start_url).toBe('/tap');
+    expect(manifest.icons[0].src).toBe('/icons/org/org-1/tap-192.png');
   });
 
   it('/pair is served through it, without a session', async () => {

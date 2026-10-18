@@ -11,6 +11,7 @@ import { buildDeviceCookie, cookieValue, deviceKeyFrom, isDevelopment, LEGACY_SE
 // See LICENSE (AGPL-3.0-or-later) and the /version route below.
 const DEFAULT_SOURCE_URL = 'https://github.com/arcanum-pos';
 import { UIFrontendProxy } from './services/uiProxy';
+import { iconRef, orgIconRoute, orgIconUrl, orgManifestUrl, type IconRef } from './bff/org-icons';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -153,15 +154,19 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // opens that order — its own manifest, made here (nothing secret: the
     // token is in the address already). iOS only allows Web Push from there.
     const manifestMatch = path.match(/^\/volg\/([A-Za-z0-9_-]{20,64})\/manifest\.webmanifest$/);
-    if (manifestMatch) return orderManifest(manifestMatch[1]);
+    // `icon=<org>/selforder`: the organisation's own icon (bff/org-icons.ts).
+    if (manifestMatch) return orderManifest(manifestMatch[1], iconRef(url.searchParams.get('icon')));
     // A kassa's Tap to Pay phone (and the kassa's QR for a payment): public —
     // the page holds no data; the phone's calls carry its key, the QR's its
     // payment's own token. Paired from the page itself: on an iPhone, the
     // home-screen app keeps its own cookies, apart from Safari's.
-    if (path === '/tap/manifest.webmanifest') return appManifest('/tap', 'Tap to Pay', 'tap');
+    // The console's link carries the org's icon (`icon=<org>/tap`): the page and its manifest have it.
+    if (path === '/tap/manifest.webmanifest') return appManifest('/tap', 'Tap to Pay', 'tap', '/tap', iconRef(url.searchParams.get('icon')));
     if (path === '/tap') {
       const tapProxy = new UIFrontendProxy(env, { service: env.ARCANUM_FRONTENDS_SERVICE, localUrl: env.CONSOLE_LOCAL_URL, fallbackFile: '/tap.html' });
-      return tapProxy.handleRequest(request, '/tap.html');
+      const ref = iconRef(url.searchParams.get('icon'));
+      const page = await tapProxy.handleRequest(request, '/tap.html');
+      return ref ? withHead(page, { icon96: orgIconUrl(ref, 96), icon180: orgIconUrl(ref, 180), manifest: `/tap/manifest.webmanifest?${new URLSearchParams({ icon: `${ref.org}/${ref.slot}` })}` }) : page;
     }
     // The follow page's service worker (shows the notification): public,
     // from arcanum-frontends' public/.
@@ -223,6 +228,12 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // The screens' app icons and manifests (arcanum-frontends' public/icons/):
     // public too — a browser fetches a manifest without cookies, and the
     // login prompt shows them before anyone signed in.
+    // An organisation's own app icons (bff/org-icons.ts): its own, else the default.
+    if (path.startsWith('/icons/org/')) {
+      const iconsProxy = new UIFrontendProxy(env, { service: env.ARCANUM_FRONTENDS_SERVICE, localUrl: env.CONSOLE_LOCAL_URL, fallbackFile: '/icons/arcanum-192.png' });
+      const icon = await orgIconRoute(path, url.searchParams, env, (file) => iconsProxy.handleRequest(new Request(new URL(file, url), { headers: request.headers }), file));
+      return icon ?? new Response(null, { status: 404 });
+    }
     if (path.startsWith('/assets/') || path.startsWith('/icons/')) {
       const assetsProxy = new UIFrontendProxy(env, {
         service: env.ARCANUM_FRONTENDS_SERVICE,
@@ -438,8 +449,8 @@ function isScannedPath(path: string): boolean {
 // menu and the next order (/bestel/…, /volg/…) without leaving the app —
 // the page itself opens the newest order, or the menu once this one's
 // finished.
-export function orderManifest(token: string): Response {
-  return appManifest(`/volg/${token}`, 'Bestelling', 'selforder', '/');
+export function orderManifest(token: string, ref: IconRef | null = null): Response {
+  return appManifest(`/volg/${token}`, 'Bestelling', 'selforder', '/', ref?.slot === 'selforder' ? ref : null);
 }
 
 // A device installed from its pairing link (/pair?code=…&role=…&name=…):
@@ -458,18 +469,34 @@ const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '
 
 // pair.html with the linked device's head: icon, home-screen icon, manifest,
 // name under the icon, title (arcanum-frontends' pair.html has each of these
-// once — its scripts/app-icons.test.ts checks the links).
+// once — its scripts/app-icons.test.ts checks the links). With `icon`
+// (<org>/<slot>): that organisation's own icons.
 export async function asDevice(page: Response, params: URLSearchParams): Promise<Response> {
   const device = linkedDevice(params);
-  if (!device || !page.ok || !(page.headers.get('Content-Type') ?? '').includes('text/html')) return page;
-  const name = escapeHtml(device.name);
-  const manifest = escapeHtml(`/pair/manifest.webmanifest?${new URLSearchParams({ role: device.role, name: device.name })}`);
-  const html = (await page.text())
-    .replace(/(<link rel="icon"[^>]*href=")[^"]*/, `$1/icons/${device.icon}-96.png`)
-    .replace(/(<link rel="apple-touch-icon"[^>]*href=")[^"]*/, `$1/icons/${device.icon}-180.png`)
-    .replace(/(<link rel="manifest"[^>]*href=")[^"]*/, `$1${manifest}`)
-    .replace(/(<meta name="apple-mobile-web-app-title"[^>]*content=")[^"]*/, () => `<meta name="apple-mobile-web-app-title" content="${name}`)
-    .replace(/<title>[^<]*<\/title>/, () => `<title>${name}</title>`);
+  if (!device) return page;
+  const ref = iconRef(params.get('icon'));
+  return withHead(page, {
+    icon96: ref ? orgIconUrl(ref, 96) : `/icons/${device.icon}-96.png`,
+    icon180: ref ? orgIconUrl(ref, 180) : `/icons/${device.icon}-180.png`,
+    manifest: ref ? orgManifestUrl(ref, device.name) : `/pair/manifest.webmanifest?${new URLSearchParams({ role: device.role, name: device.name })}`,
+    name: device.name,
+  });
+}
+
+// A page with these in its head (the first of each), as sent.
+export async function withHead(page: Response, head: { icon96: string; icon180: string; manifest: string; name?: string }): Promise<Response> {
+  if (!page.ok || !(page.headers.get('Content-Type') ?? '').includes('text/html')) return page;
+  const attr = (value: string) => escapeHtml(value);
+  let html = (await page.text())
+    .replace(/(<link rel="icon"[^>]*href=")[^"]*/, (_, start: string) => start + attr(head.icon96))
+    .replace(/(<link rel="apple-touch-icon"[^>]*href=")[^"]*/, (_, start: string) => start + attr(head.icon180))
+    .replace(/(<link rel="manifest"[^>]*href=")[^"]*/, (_, start: string) => start + attr(head.manifest));
+  if (head.name !== undefined) {
+    const name = escapeHtml(head.name);
+    html = html
+      .replace(/(<meta name="apple-mobile-web-app-title"[^>]*content=")[^"]*/, (_, start: string) => start + name)
+      .replace(/<title>[^<]*<\/title>/, () => `<title>${name}</title>`);
+  }
   const headers = new Headers(page.headers);
   headers.delete('Content-Length');
   return new Response(html, { status: page.status, headers });
@@ -501,7 +528,7 @@ function manifestIcons(icon: string) {
 }
 
 // icon: one of arcanum-frontends' public/icons/ sets (scripts/app-icons.mjs).
-export function appManifest(start: string, name: string, icon: string, scope = start): Response {
+export function appManifest(start: string, name: string, icon: string, scope = start, ref: IconRef | null = null): Response {
   return new Response(
     JSON.stringify({
       name,
@@ -512,7 +539,7 @@ export function appManifest(start: string, name: string, icon: string, scope = s
       display: 'standalone',
       background_color: '#ffffff',
       theme_color: '#ffffff',
-      icons: manifestIcons(icon),
+      icons: ref ? [192, 512].map((size) => ({ src: orgIconUrl(ref, size), sizes: `${size}x${size}`, type: 'image/png', purpose: 'any' })) : manifestIcons(icon),
     }),
     { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' } }
   );

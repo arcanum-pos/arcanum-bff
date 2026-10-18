@@ -46,6 +46,12 @@ async function backend(request: Request) {
     const purpose = url.searchParams.get('purpose');
     return Response.json({ ...IDP, clientId: `${purpose}-client`, clientSecret: `${purpose}-secret` });
   }
+  // An organisation's own app icon: org-own has one for every slot, others none.
+  if (url.pathname.startsWith('/public/icons/')) {
+    return url.pathname.startsWith('/public/icons/org-own/')
+      ? new Response(`own ${url.pathname}`, { headers: { 'Content-Type': 'image/png' } })
+      : Response.json({ error: 'Not found' }, { status: 404 });
+  }
   return Response.json({ echo: true, path: url.pathname, search: url.search, headers: Object.fromEntries(request.headers) });
 }
 
