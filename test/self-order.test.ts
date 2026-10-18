@@ -54,7 +54,7 @@ describe('self-ordering without a session', () => {
     const res = await call('/volg/abcdefghijklmnopqrstuvwx/manifest.webmanifest');
     expect(res.headers.get('Content-Type')).toBe('application/manifest+json');
     const manifest = (await res.json()) as { icons: { src: string }[] };
-    expect(manifest).toMatchObject({ start_url: '/volg/abcdefghijklmnopqrstuvwx', scope: '/volg/abcdefghijklmnopqrstuvwx', display: 'standalone' });
+    expect(manifest).toMatchObject({ start_url: '/volg/abcdefghijklmnopqrstuvwx', scope: '/', display: 'standalone' });
     expect(manifest.icons.map((i) => i.src)).toContain('/icons/selforder-512.png');
     expect((await call('/volg/short/manifest.webmanifest', { headers: { Accept: 'text/html' } })).headers.get('Content-Type')).not.toBe('application/manifest+json');
   });

@@ -429,18 +429,22 @@ function isScannedPath(path: string): boolean {
 
 // A follow page's web app manifest (see the route above): opens that order,
 // standalone. The page sets the shown name (apple-mobile-web-app-title).
+// The scope the whole site: from that order the app goes on to the event's
+// menu and the next order (/bestel/…, /volg/…) without leaving the app —
+// the page itself opens the newest order, or the menu once this one's
+// finished.
 export function orderManifest(token: string): Response {
-  return appManifest(`/volg/${token}`, 'Bestelling', 'selforder');
+  return appManifest(`/volg/${token}`, 'Bestelling', 'selforder', '/');
 }
 
 // icon: one of arcanum-frontends' public/icons/ sets (scripts/app-icons.mjs).
-export function appManifest(start: string, name: string, icon: string): Response {
+export function appManifest(start: string, name: string, icon: string, scope = start): Response {
   return new Response(
     JSON.stringify({
       name,
       short_name: name,
       start_url: start,
-      scope: start,
+      scope,
       id: start,
       display: 'standalone',
       background_color: '#ffffff',
