@@ -11,7 +11,7 @@ import { buildDeviceCookie, cookieValue, deviceKeyFrom, isDevelopment, LEGACY_SE
 // See LICENSE (AGPL-3.0-or-later) and the /version route below.
 const DEFAULT_SOURCE_URL = 'https://github.com/arcanum-pos';
 import { UIFrontendProxy } from './services/uiProxy';
-import { iconRef, orgIconRoute, orgIconUrl, orgManifestUrl, type IconRef } from './bff/org-icons';
+import { CONSOLE_ORG_COOKIE, iconRef, orgIconRoute, orgIconUrl, orgManifestUrl, type IconRef } from './bff/org-icons';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -316,7 +316,7 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
         localUrl: env.CONSOLE_LOCAL_URL,
         fallbackFile: '/admin.html',
       });
-      return consoleProxy.handleRequest(request, path);
+      return asConsole(await consoleProxy.handleRequest(request, path), request);
     }
 
     // Root "/" — the org + device-role chooser (arcanum-frontends'
@@ -481,6 +481,15 @@ export async function asDevice(page: Response, params: URLSearchParams): Promise
     manifest: ref ? orgManifestUrl(ref, device.name) : `/pair/manifest.webmanifest?${new URLSearchParams({ role: device.role, name: device.name })}`,
     name: device.name,
   });
+}
+
+// The console, sent with the icon of the organisation it was last working in
+// (its cookie) — Safari's Add to Dock reads what was sent. No cookie (a first
+// visit): as it is, the default console icon.
+export async function asConsole(page: Response, request: Request): Promise<Response> {
+  const ref = iconRef(`${cookieValue(request, CONSOLE_ORG_COOKIE) ?? ''}/console`);
+  if (!ref) return page;
+  return withHead(page, { icon96: orgIconUrl(ref, 96), icon180: orgIconUrl(ref, 180), manifest: orgManifestUrl(ref, 'Console') });
 }
 
 // A page with these in its head (the first of each), as sent.

@@ -2,7 +2,9 @@
 // Instellingen → Weergave → App-iconen), served at
 //   /icons/org/<org>/<slot>-<96|180|192|512>.png   the org's — else the default (public/icons/)
 //   /icons/org/<org>/<slot>.webmanifest?name=      a manifest with those icons
-// Public, like /icons/*: they're on people's home screens. A page that
+// Public, like /icons/*: they're on people's home screens. The console is
+// sent with the icon of the organisation its cookie names (CONSOLE_ORG_COOKIE,
+// set by the console when you switch organisation). A page that
 // knows its organisation links these instead of the default set; a pairing
 // link carries `icon=<org>/<slot>` so the page is sent with them (Safari's
 // Add to Dock reads what was sent).
@@ -18,6 +20,7 @@ const DEFAULT_ICON: Record<string, string> = {
   tap: 'tap',
   waiter: 'waiter',
   selforder: 'selforder',
+  console: 'admin',
 };
 const DEFAULT_NAME: Record<string, string> = {
   kassa: 'Kassa',
@@ -28,8 +31,11 @@ const DEFAULT_NAME: Record<string, string> = {
   tap: 'Tap to Pay',
   waiter: 'Bediening',
   selforder: 'Bestellen',
+  console: 'Console',
 };
 const STATION_SLOT = /^station-[A-Za-z0-9_-]{1,64}$/;
+// The organisation the console was last working in (set by the console; only its id).
+export const CONSOLE_ORG_COOKIE = 'arcanum-console-org';
 const ORG_ID = /^[A-Za-z0-9_-]{1,80}$/;
 
 export interface IconRef {

@@ -3,7 +3,7 @@
 // session — and nothing else opens up with them.
 import { env } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
-import worker, { asDevice } from '../src/index';
+import worker, { asConsole, asDevice } from '../src/index';
 
 const BASE = 'https://arcanum.test';
 
@@ -135,7 +135,7 @@ describe('app icons', () => {
     expect(await (await call('/icons/org/org-plain/station-st_1-96.png')).text()).toBe('<html>frontends /icons/station-96.png</html>');
     expect(await (await call('/icons/org/org-plain/pickup-192.png')).text()).toBe('<html>frontends /icons/station-192.png</html>');
     // Not a page that takes an icon, or a size that isn't made.
-    expect((await call('/icons/org/org-own/console-180.png')).status).toBe(404);
+    expect((await call('/icons/org/org-own/start-180.png')).status).toBe(404);
     expect((await call('/icons/org/org-own/kassa-64.png')).status).toBe(404);
     const manifest = (await (await call('/icons/org/org-own/station-st_1.webmanifest?name=Keuken')).json()) as { name: string; scope: string; start_url?: string; icons: { src: string; purpose: string }[] };
     expect(manifest).toMatchObject({ name: 'Keuken', scope: '/', display: 'standalone' });
@@ -160,6 +160,17 @@ describe('app icons', () => {
     const manifest = (await (await call('/tap/manifest.webmanifest?icon=org-1/tap')).json()) as { start_url: string; icons: { src: string }[] };
     expect(manifest.start_url).toBe('/tap');
     expect(manifest.icons[0].src).toBe('/icons/org/org-1/tap-192.png');
+  });
+
+  it("the console is sent with the icon of the organisation its cookie names; no cookie, or a made-up one: as it is", async () => {
+    const withCookie = (cookie: string) => new Request('https://arcanum.test/console', { headers: { Cookie: cookie } });
+    const html = await (await asConsole(page(), withCookie('session=x; arcanum-console-org=org-1'))).text();
+    expect(html).toContain('<link rel="apple-touch-icon" href="/icons/org/org-1/console-180.png" />');
+    expect(html).toContain('<link rel="manifest" href="/icons/org/org-1/console.webmanifest?name=Console" />');
+    expect(await (await asConsole(page(), withCookie('session=x'))).text()).toBe(PAIR_HTML);
+    expect(await (await asConsole(page(), withCookie('arcanum-console-org=../evil'))).text()).toBe(PAIR_HTML);
+    // Its default when the org has none: the console's own set.
+    expect(await (await call('/icons/org/org-plain/console-180.png')).text()).toBe('<html>frontends /icons/admin-180.png</html>');
   });
 
   it('/pair is served through it, without a session', async () => {
