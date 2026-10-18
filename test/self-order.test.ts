@@ -99,6 +99,19 @@ describe('self-ordering without a session', () => {
 });
 
 describe('app icons', () => {
+  it("a pairing link's manifest: that device's name and icon, without a session — the name only as data", async () => {
+    const res = await call('/pair/manifest.webmanifest?role=pos&name=Kassa%201');
+    expect(res.headers.get('Content-Type')).toBe('application/manifest+json');
+    const manifest = (await res.json()) as { name: string; start_url?: string; scope: string; icons: { src: string }[] };
+    expect(manifest).toMatchObject({ name: 'Kassa 1', short_name: 'Kassa 1', scope: '/', display: 'standalone' });
+    expect(manifest.start_url).toBeUndefined();
+    expect(manifest.icons.map((i) => i.src)).toContain('/icons/kassa-192.png');
+    const odd = (await (await call(`/pair/manifest.webmanifest?role=nope&name=${encodeURIComponent('"}<x>'.padEnd(80, 'x'))}`)).json()) as { name: string; icons: { src: string }[] };
+    expect(odd.name).toHaveLength(60);
+    expect(odd.icons[0].src).toBe('/icons/arcanum-192.png');
+    expect(((await (await call('/pair/manifest.webmanifest?role=station')).json()) as { name: string }).name).toBe('Station');
+  });
+
   it("every screen's icons and manifests, without a session (a browser fetches a manifest without cookies)", async () => {
     for (const path of ['/icons/kassa-180.png', '/icons/kassa.webmanifest', '/icons/arcanum-96.png']) {
       const res = await call(path);

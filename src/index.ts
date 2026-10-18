@@ -181,6 +181,9 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // Pairing a station screen or customer display with its code alone (no
     // account needed): arcanum-frontends' pair.html. A kassa's code sends
     // the person on to sign in first.
+    // The console's pairing link carries the device (role, name): its own
+    // manifest, so an app installed from it is that device (the page links it).
+    if (path === '/pair/manifest.webmanifest') return deviceManifest(url.searchParams);
     if (path === '/pair') {
       const pairProxy = new UIFrontendProxy(env, {
         service: env.ARCANUM_FRONTENDS_SERVICE,
@@ -437,6 +440,35 @@ export function orderManifest(token: string): Response {
   return appManifest(`/volg/${token}`, 'Bestelling', 'selforder', '/');
 }
 
+// A device installed from its pairing link (/pair?code=…&role=…&name=…):
+// its name and icon. No start_url — the page it was added from, the link
+// itself, which opens the screen once paired; the scope the whole site.
+const DEVICE_ICONS: Record<string, [icon: string, name: string]> = { pos: ['kassa', 'Kassa'], cfd: ['display', 'Klantscherm'], station: ['station', 'Station'] };
+
+export function deviceManifest(params: URLSearchParams): Response {
+  const [icon, fallback] = DEVICE_ICONS[params.get('role') ?? ''] ?? ['arcanum', 'Arcanum'];
+  const name = (params.get('name') ?? '').trim().slice(0, 60) || fallback;
+  return new Response(
+    JSON.stringify({
+      name,
+      short_name: name,
+      scope: '/',
+      display: 'standalone',
+      background_color: '#ffffff',
+      icons: manifestIcons(icon),
+    }),
+    { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' } }
+  );
+}
+
+function manifestIcons(icon: string) {
+  return [
+    { src: `/icons/${icon}-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: `/icons/${icon}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: `/icons/${icon}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  ];
+}
+
 // icon: one of arcanum-frontends' public/icons/ sets (scripts/app-icons.mjs).
 export function appManifest(start: string, name: string, icon: string, scope = start): Response {
   return new Response(
@@ -449,11 +481,7 @@ export function appManifest(start: string, name: string, icon: string, scope = s
       display: 'standalone',
       background_color: '#ffffff',
       theme_color: '#ffffff',
-      icons: [
-        { src: `/icons/${icon}-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: `/icons/${icon}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: `/icons/${icon}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-      ],
+      icons: manifestIcons(icon),
     }),
     { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' } }
   );
