@@ -158,7 +158,7 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // the page holds no data; the phone's calls carry its key, the QR's its
     // payment's own token. Paired from the page itself: on an iPhone, the
     // home-screen app keeps its own cookies, apart from Safari's.
-    if (path === '/tap/manifest.webmanifest') return appManifest('/tap', 'Tap to Pay');
+    if (path === '/tap/manifest.webmanifest') return appManifest('/tap', 'Tap to Pay', 'tap');
     if (path === '/tap') {
       const tapProxy = new UIFrontendProxy(env, { service: env.ARCANUM_FRONTENDS_SERVICE, localUrl: env.CONSOLE_LOCAL_URL, fallbackFile: '/tap.html' });
       return tapProxy.handleRequest(request, '/tap.html');
@@ -215,7 +215,10 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     // device.html and login-prompt.html are themselves served before/
     // without a session, so their own <script>/<link> tags need these to
     // load unauthenticated too.
-    if (path.startsWith('/assets/')) {
+    // The screens' app icons and manifests (arcanum-frontends' public/icons/):
+    // public too — a browser fetches a manifest without cookies, and the
+    // login prompt shows them before anyone signed in.
+    if (path.startsWith('/assets/') || path.startsWith('/icons/')) {
       const assetsProxy = new UIFrontendProxy(env, {
         service: env.ARCANUM_FRONTENDS_SERVICE,
         localUrl: env.CONSOLE_LOCAL_URL,
@@ -427,10 +430,11 @@ function isScannedPath(path: string): boolean {
 // A follow page's web app manifest (see the route above): opens that order,
 // standalone. The page sets the shown name (apple-mobile-web-app-title).
 export function orderManifest(token: string): Response {
-  return appManifest(`/volg/${token}`, 'Bestelling');
+  return appManifest(`/volg/${token}`, 'Bestelling', 'selforder');
 }
 
-export function appManifest(start: string, name: string): Response {
+// icon: one of arcanum-frontends' public/icons/ sets (scripts/app-icons.mjs).
+export function appManifest(start: string, name: string, icon: string): Response {
   return new Response(
     JSON.stringify({
       name,
@@ -441,7 +445,11 @@ export function appManifest(start: string, name: string): Response {
       display: 'standalone',
       background_color: '#ffffff',
       theme_color: '#ffffff',
-      icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }],
+      icons: [
+        { src: `/icons/${icon}-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: `/icons/${icon}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: `/icons/${icon}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
     }),
     { headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' } }
   );

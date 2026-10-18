@@ -53,7 +53,9 @@ describe('self-ordering without a session', () => {
     expect(await sw.text()).toContain('/push-sw.js');
     const res = await call('/volg/abcdefghijklmnopqrstuvwx/manifest.webmanifest');
     expect(res.headers.get('Content-Type')).toBe('application/manifest+json');
-    expect(await res.json()).toMatchObject({ start_url: '/volg/abcdefghijklmnopqrstuvwx', scope: '/volg/abcdefghijklmnopqrstuvwx', display: 'standalone' });
+    const manifest = (await res.json()) as { icons: { src: string }[] };
+    expect(manifest).toMatchObject({ start_url: '/volg/abcdefghijklmnopqrstuvwx', scope: '/volg/abcdefghijklmnopqrstuvwx', display: 'standalone' });
+    expect(manifest.icons.map((i) => i.src)).toContain('/icons/selforder-512.png');
     expect((await call('/volg/short/manifest.webmanifest', { headers: { Accept: 'text/html' } })).headers.get('Content-Type')).not.toBe('application/manifest+json');
   });
 
@@ -61,7 +63,9 @@ describe('self-ordering without a session', () => {
     const page = await call('/tap', { headers: { Accept: 'text/html' } });
     expect(page.status).toBe(200);
     expect(await page.text()).toBe('<html>frontends /tap.html</html>');
-    expect(await (await call('/tap/manifest.webmanifest')).json()).toMatchObject({ start_url: '/tap', scope: '/tap', display: 'standalone', name: 'Tap to Pay' });
+    const manifest = (await (await call('/tap/manifest.webmanifest')).json()) as { icons: { src: string }[] };
+    expect(manifest).toMatchObject({ start_url: '/tap', scope: '/tap', display: 'standalone', name: 'Tap to Pay' });
+    expect(manifest.icons.map((i) => i.src)).toContain('/icons/tap-192.png');
     const charge = await call('/api/public/tap/charge-1/token-1', { headers: { 'X-User-Sub': 'forged' } });
     expect(((await charge.json()) as { path: string }).path).toBe('/public/tap/charge-1/token-1');
     const back = await call('/api/public/tap/charge-1/token-1/return', { method: 'POST', headers: { Origin: BASE }, body: '{}' });
@@ -91,5 +95,15 @@ describe('self-ordering without a session', () => {
     spy.mockRestore();
     expect(new URL(seen[0].url).pathname + new URL(seen[0].url).search).toBe('/orders/connect?ticket=abc.def');
     expect(seen[0].headers.get('Cookie')).toBeNull();
+  });
+});
+
+describe('app icons', () => {
+  it("every screen's icons and manifests, without a session (a browser fetches a manifest without cookies)", async () => {
+    for (const path of ['/icons/kassa-180.png', '/icons/kassa.webmanifest', '/icons/arcanum-96.png']) {
+      const res = await call(path);
+      expect(res.status, path).toBe(200);
+      expect(await res.text()).toBe(`<html>frontends ${path}</html>`);
+    }
   });
 });
