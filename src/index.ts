@@ -79,6 +79,10 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
           source_url: env.SOURCE_URL || DEFAULT_SOURCE_URL,
           // Whether /installer is reachable — the console shows its link.
           installer: installerAvailable(env),
+          // With compose (the installer's compose mode): a fingerprint of the
+          // installation's settings, so the installer sees they're applied.
+          // A short hash — nothing to learn from it.
+          ...(env.TRESJR_SETTINGS ? { settings: env.TRESJR_SETTINGS } : {}),
         }),
         request,
         env
