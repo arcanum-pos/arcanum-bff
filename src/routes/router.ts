@@ -71,7 +71,9 @@ const ROUTES: RouteDefinition[] = [
   // order's token, and bounds what an order can be.
   {
     // …and a table's QR (release C): which table, and its tab to order on.
-    pattern: /^\/api\/public\/(self-order\/[^/]+(\/orders)?|orders\/[^/]+(\/bancontact|\/orders|\/notify|\/push)?|tables\/[^/]+|tap\/[^/]+\/[^/]+(\/return)?)$/,
+    // …and the customer display's logo and colours (branding — public like
+    // an org's app icons; a display paired by code alone has no session).
+    pattern: /^\/api\/public\/(self-order\/[^/]+(\/orders)?|orders\/[^/]+(\/bancontact|\/orders|\/notify|\/push)?|tables\/[^/]+|tap\/[^/]+\/[^/]+(\/return)?|branding\/[^/]+(\/logo\.png)?)$/,
     service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: false,
     rewritePath: { from: '/api/public', to: '/public' },

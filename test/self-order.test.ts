@@ -31,6 +31,10 @@ describe('self-ordering without a session', () => {
     expect(((await (await call('/api/public/orders/a-token')).json()) as { path: string }).path).toBe('/public/orders/a-token');
     // A table's QR (release C).
     expect(((await (await call('/api/public/tables/a-token')).json()) as { path: string }).path).toBe('/public/tables/a-token');
+    // The customer display's logo and colours (no session on a display paired by code).
+    expect(((await (await call('/api/public/branding/org-1?event=e1')).json()) as { path: string }).path).toBe('/public/branding/org-1');
+    expect(((await (await call('/api/public/branding/org-1/logo.png')).json()) as { path: string }).path).toBe('/public/branding/org-1/logo.png');
+    expect((await call('/api/public/branding/org-1/other')).status).toBe(404);
     const placed = await call('/api/public/self-order/the-code/orders', { method: 'POST', headers: { Origin: BASE, 'Content-Type': 'application/json' }, body: '{}' });
     expect(((await placed.json()) as { path: string }).path).toBe('/public/self-order/the-code/orders');
     const pay = await call('/api/public/orders/a-token/bancontact', { method: 'POST', headers: { Origin: BASE } });
