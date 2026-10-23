@@ -102,7 +102,7 @@ describe('login', () => {
     expect(sessionOf(ok)).toMatch(/^__Host-session_id=[0-9a-f]{64}$/);
   });
 
-  it('the session is __Host-, Secure, HttpOnly, SameSite=Lax — and stored encrypted: no token readable in KV', async () => {
+  it('the session is __Host-, Secure, HttpOnly, SameSite=Lax - and stored encrypted: no token readable in KV', async () => {
     const cookie = await login();
     const id = cookie.split('=')[1];
     const raw = (await env.ARCANUM_SESSIONS.get(id))!;
@@ -118,7 +118,7 @@ describe('login', () => {
 });
 
 describe('the old session_id cookie', () => {
-  it('is never read any more (a sibling subdomain could plant one) — and a browser that still sends it gets it cleared', async () => {
+  it('is never read any more (a sibling subdomain could plant one) - and a browser that still sends it gets it cleared', async () => {
     const id = 'a'.repeat(64);
     await env.ARCANUM_SESSIONS.put(id, JSON.stringify({ access_token: 'x', id_token: fakeJwt({ sub: 'old', email: 'old@example.test' }), refresh_token: null, email: 'old@example.test', name: '', expires_at: Date.now() / 1000 + 3600, issuer: 'https://login.test', authPurpose: 'authcode' }));
     const res = await call(`${BASE}/whoami`, { headers: { Cookie: `session_id=${id}` } });
@@ -132,7 +132,7 @@ describe('the old session_id cookie', () => {
 });
 
 describe('no bearer-token way in', () => {
-  it('an Authorization header is not a session — and causes no call to the login provider', async () => {
+  it('an Authorization header is not a session - and causes no call to the login provider', async () => {
     mockProvider();
     expect((await call(`${BASE}/whoami`, { headers: { Authorization: 'Bearer some-token-from-another-installation' } })).status).toBe(401);
     expect((await call(`${BASE}/api/organizations/memberships`, { headers: { Authorization: 'Bearer x' } })).status).toBe(401);
@@ -251,7 +251,7 @@ describe('writes only from this very site (same-site CSRF)', () => {
   const post = (path: string, headers: Record<string, string>, url = BASE) =>
     call(`${url}${path}`, { method: 'POST', headers: { 'Content-Type': 'text/plain', ...headers }, body: '{"name":"x"}' });
 
-  it('refuses a write from a sibling subdomain (same site, other origin) — to the API and to the installer', async () => {
+  it('refuses a write from a sibling subdomain (same site, other origin) - to the API and to the installer', async () => {
     const cookie = `__Host-session_id=${await storeSession()}`;
     for (const headers of [{ Origin: 'https://www.arcanum.test' }, { 'Sec-Fetch-Site': 'same-site' }, { 'Sec-Fetch-Site': 'cross-site' }] as Record<string, string>[]) {
       expect((await post('/api/organizations/org-1/members', { Cookie: cookie, ...headers })).status, JSON.stringify(headers)).toBe(403);
@@ -259,7 +259,7 @@ describe('writes only from this very site (same-site CSRF)', () => {
     }
   });
 
-  it('lets this site write — on FRONTEND_URL or the address the browser is on (workers.dev) — and reads from anywhere', async () => {
+  it('lets this site write - on FRONTEND_URL or the address the browser is on (workers.dev) - and reads from anywhere', async () => {
     const cookie = `__Host-session_id=${await storeSession()}`;
     const own = await post('/api/organizations/org-1/members', { Cookie: cookie, Origin: BASE, 'Sec-Fetch-Site': 'same-origin' });
     expect(((await own.json()) as { path: string }).path).toBe('/organizations/org-1/members');
@@ -278,7 +278,7 @@ describe('writes only from this very site (same-site CSRF)', () => {
 });
 
 describe('no credentials to the Workers behind that do without', () => {
-  it('the API: identity headers only — no session cookie, no access token, nothing a client put in Authorization', async () => {
+  it('the API: identity headers only - no session cookie, no access token, nothing a client put in Authorization', async () => {
     const cookie = `__Host-session_id=${await storeSession({ access_token: 'secret-access-token' })}`;
     const res = await call(`${BASE}/api/organizations/memberships`, { headers: { Cookie: cookie, Authorization: 'Bearer i-am-the-internal-key' } });
     const echo = (await res.json()) as { headers: Record<string, string> };

@@ -148,7 +148,7 @@ describe('/device', () => {
 });
 
 describe('/logout', () => {
-  it("signs out at the provider and returns to FRONTEND_URL — also for a session from before phase 6 (with an orgId)", async () => {
+  it("signs out at the provider and returns to FRONTEND_URL - also for a session from before phase 6 (with an orgId)", async () => {
     const id = crypto.randomUUID().replace(/-/g, '');
     const old = { access_token: 'a', id_token: 'tok', refresh_token: null, email: '', name: '', expires_at: Date.now() / 1000 + 3600, issuer: 'https://login.test', authPurpose: 'authcode', orgId: 'pos.some-org.test' } satisfies SessionData & { orgId: string };
     await env.ARCANUM_SESSIONS.put(id, JSON.stringify(old));

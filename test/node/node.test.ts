@@ -24,7 +24,7 @@ async function listen(server: http.Server): Promise<string> {
 }
 
 describe('sessions in SQLite (KV)', () => {
-  it('put, get, delete — and gone once expired', async () => {
+  it('put, get, delete - and gone once expired', async () => {
     const kv = new SqliteKV(path.join(dir, 'kv.db'));
     await kv.put('s1', 'one', { expirationTtl: 60 });
     expect(await kv.get('s1')).toBe('one');
@@ -120,7 +120,7 @@ describe('the whole bff on Node', () => {
     expect(await res.json()).toEqual({ backend: '/public/tables/qr-1', sub: null });
   });
 
-  it('the public API to the backend, with no identity — even one a client made up', async () => {
+  it('the public API to the backend, with no identity - even one a client made up', async () => {
     const res = await fetch(`${bff}/api/public/self-order/the-code`, { headers: { 'X-User-Sub': 'forged' } });
     expect(await res.json()).toEqual({ backend: '/public/self-order/the-code', sub: null });
   });
@@ -132,7 +132,7 @@ describe('the whole bff on Node', () => {
     expect(await kassa.text()).toBe('<html>frontends /login-prompt.html</html>');
   });
 
-  it("a device's socket goes to devicehub — without the person's cookie or Authorization", async () => {
+  it("a device's socket goes to devicehub - without the person's cookie or Authorization", async () => {
     const socket = net.connect(Number(new URL(bff).port), '127.0.0.1');
     await once(socket, 'connect');
     socket.write(

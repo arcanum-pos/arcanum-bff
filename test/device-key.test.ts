@@ -27,7 +27,7 @@ describe('pairing with the code alone', () => {
     expect(await res.text()).toBe('<html>frontends /pair.html</html>');
   });
 
-  it("turns the device's key into an HttpOnly cookie — and takes it out of the answer", async () => {
+  it("turns the device's key into an HttpOnly cookie - and takes it out of the answer", async () => {
     const seen: Request[] = [];
     vi.spyOn(env.ARCANUM_BACKEND_SERVICE, 'fetch').mockImplementation(async (input: any, init?: any) => {
       seen.push(new Request(input, init));
@@ -71,7 +71,7 @@ describe('a paired device afterwards', () => {
     expect(body.headers['x-device-key']).toBe(KEY);
   });
 
-  it('opens its own page and the start page — not the console', async () => {
+  it('opens its own page and the start page - not the console', async () => {
     for (const path of ['/station.html', '/display.html', '/']) {
       const res = await call(path, { headers: { Cookie: COOKIE, Accept: 'text/html' } });
       expect(res.status, path).toBe(200);

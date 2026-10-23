@@ -13,7 +13,7 @@ function call(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 describe('self-ordering without a session', () => {
-  it('serves the guest pages (/bestel/…, /volg/…) — not the login prompt', async () => {
+  it('serves the guest pages (/bestel/…, /volg/…) - not the login prompt', async () => {
     for (const path of ['/bestel/abcdefghijklmnopqrstuvwxyz012345', '/volg/abcdefghijklmnopqrstuvwx', '/tafel/abcdefghjkmnpqrstuvw']) {
       const res = await call(path, { headers: { Accept: 'text/html' } });
       expect(res.status, path).toBe(200);
@@ -21,7 +21,7 @@ describe('self-ordering without a session', () => {
     }
   });
 
-  it('forwards the public API to the backend, with no identity — even one a client made up', async () => {
+  it('forwards the public API to the backend, with no identity - even one a client made up', async () => {
     const res = await call('/api/public/self-order/the-code', { headers: { 'X-User-Sub': 'forged', 'X-User-Issuer': 'https://evil.test' } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { path: string; headers: Record<string, string> };
@@ -66,7 +66,7 @@ describe('self-ordering without a session', () => {
     expect((await call('/volg/short/manifest.webmanifest', { headers: { Accept: 'text/html' } })).headers.get('Content-Type')).not.toBe('application/manifest+json');
   });
 
-  it("a kassa's Tap to Pay phone: its page and manifest, and a payment's QR link — public; nothing more", async () => {
+  it("a kassa's Tap to Pay phone: its page and manifest, and a payment's QR link - public; nothing more", async () => {
     const page = await call('/tap', { headers: { Accept: 'text/html' } });
     expect(page.status).toBe(200);
     expect(await page.text()).toBe('<html>frontends /tap.html</html>');
@@ -129,7 +129,7 @@ describe('app icons', () => {
     expect(await (await asDevice(page(), new URLSearchParams({ role: 'admin' }))).text()).toBe(PAIR_HTML);
   });
 
-  it("an organisation's own icons: its own when it has one, else the default — without a session", async () => {
+  it("an organisation's own icons: its own when it has one, else the default - without a session", async () => {
     const own = await call('/icons/org/org-own/kassa-180.png');
     expect(own.status).toBe(200);
     expect(await own.text()).toBe('own /public/icons/org-own/kassa/180');
@@ -183,7 +183,7 @@ describe('app icons', () => {
     expect(await res.text()).toBe('<html>frontends /pair.html</html>');
   });
 
-  it("a pairing link's manifest: that device's name and icon, without a session — the name only as data", async () => {
+  it("a pairing link's manifest: that device's name and icon, without a session - the name only as data", async () => {
     const res = await call('/pair/manifest.webmanifest?role=pos&name=Kassa%201');
     expect(res.headers.get('Content-Type')).toBe('application/manifest+json');
     const manifest = (await res.json()) as { name: string; start_url?: string; scope: string; icons: { src: string }[] };

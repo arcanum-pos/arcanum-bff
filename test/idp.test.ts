@@ -57,7 +57,7 @@ function mockOwnProvider(discovery: Record<string, unknown> | null = {}) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("the login provider from the bff's own settings", () => {
-  it("/login goes to the discovered authorize endpoint with the bff's own client — the backend isn't asked", async () => {
+  it("/login goes to the discovered authorize endpoint with the bff's own client - the backend isn't asked", async () => {
     const seen = mockOwnProvider({ issuer: 'https://own-idp.test-unique-1' });
     const backend = vi.spyOn(env.ARCANUM_BACKEND_SERVICE, 'fetch');
     const res = await call('/login', { ...OWN, DEFAULT_IDP_ISSUER_URL: 'https://own-idp.test', DEFAULT_IDP_CONNECTION_NAME: 'google-oauth2' } as any);
@@ -107,7 +107,7 @@ describe("the login provider from the bff's own settings", () => {
     expect(down.status).toBe(502);
   });
 
-  it('without them nobody can sign in — the backend is never asked for the client secret', async () => {
+  it('without them nobody can sign in - the backend is never asked for the client secret', async () => {
     const backend = vi.spyOn(env.ARCANUM_BACKEND_SERVICE, 'fetch');
     const res = await call('/login', { DEFAULT_IDP_ISSUER_URL: '', DEFAULT_IDP_CLIENT_ID: '', DEFAULT_IDP_CLIENT_SECRET: '' });
     expect(res.status).toBe(502);

@@ -129,7 +129,7 @@ describe('with the installer', () => {
     expect(echo.headers['x-user-roles']).toBeUndefined();
   });
 
-  it('passes the installer response through — adding only the security headers it lacks', async () => {
+  it('passes the installer response through - adding only the security headers it lacks', async () => {
     const res = await SELF.fetch(`${BASE}/installer/api/status`, { headers: { Cookie: await signIn() } });
     expect(res.status).toBe(299);
     expect(res.headers.get('Content-Security-Policy')).toBe("default-src 'none'; frame-ancestors 'none'");
@@ -137,7 +137,7 @@ describe('with the installer', () => {
     expect(res.headers.get('X-Installer')).toBe('echo');
   });
 
-  it("forwards installer paths that end in a file extension (step ids like assets:…-01.json) — the scanner filter doesn't apply", async () => {
+  it("forwards installer paths that end in a file extension (step ids like assets:…-01.json) - the scanner filter doesn't apply", async () => {
     const res = await SELF.fetch(`${BASE}/installer/api/steps/assets%3Aarcanum-frontends-assets-01.json`, {
       method: 'POST',
       headers: { Cookie: await signIn(), 'Content-Type': 'application/json' },

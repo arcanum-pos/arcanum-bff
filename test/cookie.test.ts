@@ -6,7 +6,7 @@ import type { Env } from '../src/types';
 const env = (over: Partial<Env>) => ({ SESSION_TTL: 604800, FRONTEND_URL: 'https://arcanum.test', ...over }) as unknown as Env;
 
 describe('session cookie', () => {
-  it('is SameSite=Lax, Secure and HttpOnly — never SameSite=None (the UI is same-origin; None would allow CSRF)', () => {
+  it('is SameSite=Lax, Secure and HttpOnly - never SameSite=None (the UI is same-origin; None would allow CSRF)', () => {
     const cookie = buildSessionCookie(env({}), 'abc');
     expect(cookie).toContain('session_id=abc');
     expect(cookie).toContain('SameSite=Lax');
