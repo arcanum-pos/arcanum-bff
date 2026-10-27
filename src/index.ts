@@ -43,6 +43,14 @@ function finish(request: Request, env: Env, upstream: Response): Response {
   setIfAbsent('Referrer-Policy', 'strict-origin-when-cross-origin');
   // No screen is ever meant to be shown inside another site's frame (clickjacking).
   setIfAbsent('X-Frame-Options', 'DENY');
+  // No screen uses the camera, microphone, location, payment or USB (the
+  // display's fullscreen stays allowed) - change this when one does.
+  setIfAbsent('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  // Other sites' windows get no handle on ours (the kassa's display, the
+  // station's pickup screen: same-origin popups, unaffected), and nothing
+  // here is loaded by another site (mails carry no images).
+  setIfAbsent('Cross-Origin-Opener-Policy', 'same-origin');
+  setIfAbsent('Cross-Origin-Resource-Policy', 'same-origin');
   const csp = h.get('Content-Security-Policy');
   if (!csp) h.set('Content-Security-Policy', "frame-ancestors 'none'");
   else if (!/frame-ancestors/.test(csp)) h.set('Content-Security-Policy', `${csp}; frame-ancestors 'none'`);

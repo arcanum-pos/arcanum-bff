@@ -229,6 +229,10 @@ describe('security headers', () => {
       expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
       expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
       expect(res.headers.get('Strict-Transport-Security')).toBe('max-age=31536000');
+      expect(res.headers.get('Permissions-Policy')).toContain('camera=()');
+      expect(res.headers.get('Permissions-Policy')).not.toContain('fullscreen');
+      expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
+      expect(res.headers.get('Cross-Origin-Resource-Policy')).toBe('same-origin');
     }
   });
 });

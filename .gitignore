@@ -2,3 +2,7 @@ node_modules/
 .wrangler/
 dist/
 .dev.vars
+
+# .zap/scan.sh
+zap-report/
+wrangler.log

@@ -1,0 +1,7 @@
+10049	IGNORE	(informational: pages are revalidated on purpose (max-age=0) so a new release shows at once; /assets/* are immutable)
+10055	IGNORE	(img-src https: - the Bancontact QR and an org's logo come from other hosts (arcanum-frontends worker/csp.ts); non-HTML answers carry only frame-ancestors)
+10094	IGNORE	(Vite's hashed file names and the signed login state - nothing secret)
+10109	IGNORE	(informational: a modern web application)
+10112	IGNORE	(informational: /login sets its state cookie)
+90004	IGNORE	(COOP and CORP are set on everything; no COEP - require-corp would block the Bancontact QR and org logos from other hosts)
+90005	IGNORE	(about ZAP's own requests lacking Sec-Fetch-* - browsers send them; writes are checked on Origin / Sec-Fetch-Site)
