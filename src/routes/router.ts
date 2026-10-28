@@ -79,6 +79,16 @@ const ROUTES: RouteDefinition[] = [
     rewritePath: { from: '/api/public', to: '/public' },
     localUrlEnv: 'BANCONTACT_LOCAL_URL',
   },
+  // A ticket printer asking for work (arcanum/PRINTING.md, Epson Server
+  // Direct Print): the printer has no session - the secret in the URL it
+  // was given (?key=) is checked by the backend (printing.ts).
+  {
+    pattern: /^\/api\/public\/print\/epson\/[^/]+$/,
+    service: 'ARCANUM_BACKEND_SERVICE',
+    requireAuth: false,
+    rewritePath: { from: '/api/public', to: '/public' },
+    localUrlEnv: 'BANCONTACT_LOCAL_URL',
+  },
   // Payment-provider webhook callbacks (Bancontact, SumUp). Deliberately
   // unauthenticated — the provider calling this has no Auth0 session/bearer
   // token to present — but still routed through this proxy rather than
