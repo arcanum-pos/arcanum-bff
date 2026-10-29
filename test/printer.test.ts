@@ -26,8 +26,18 @@ describe('a printer polling for work', () => {
     expect(body.headers['x-user-sub']).toBeUndefined();
   });
 
+  it("a push printer's certificate upload and its profile: no session either", async () => {
+    const up = await call('/api/public/print/cert/pr-1?code=the-code', { method: 'POST', headers: { 'Content-Type': 'application/x-pem-file', 'X-User-Sub': 'forged' }, body: '-----BEGIN CERTIFICATE-----' });
+    const sent = (await up.json()) as { path: string; search: string; headers: Record<string, string> };
+    expect(sent.path).toBe('/public/print/cert/pr-1');
+    expect(sent.search).toBe('?code=the-code');
+    expect(sent.headers['x-user-sub']).toBeUndefined();
+    const profile = (await (await call('/api/public/print/profile/pr-1?token=t')).json()) as { path: string };
+    expect(profile.path).toBe('/public/print/profile/pr-1');
+  });
+
   it('opens nothing else under it', async () => {
-    for (const path of ['/api/public/print/epson', '/api/public/print/epson/pr-1/jobs', '/api/public/print/star/pr-1']) {
+    for (const path of ['/api/public/print/epson', '/api/public/print/epson/pr-1/jobs', '/api/public/print/star/pr-1', '/api/public/print/cert', '/api/public/print/profile/pr-1/x']) {
       expect((await call(path, { method: 'POST', body: '' })).status, path).toBe(404);
     }
   });

@@ -81,9 +81,12 @@ const ROUTES: RouteDefinition[] = [
   },
   // A ticket printer asking for work (arcanum/PRINTING.md, Epson Server
   // Direct Print): the printer has no session - the secret in the URL it
-  // was given (?key=) is checked by the backend (printing.ts).
+  // was given (?key=) is checked by the backend (printing.ts). And trusting
+  // a push printer: the command a screen shows uploads its certificate
+  // (cert/, ?code=), an iPad's Safari downloads it as a profile (profile/,
+  // ?token=) - both without a session, the one-time code checked there too.
   {
-    pattern: /^\/api\/public\/print\/epson\/[^/]+$/,
+    pattern: /^\/api\/public\/print\/(epson|cert|profile)\/[^/]+$/,
     service: 'ARCANUM_BACKEND_SERVICE',
     requireAuth: false,
     rewritePath: { from: '/api/public', to: '/public' },
