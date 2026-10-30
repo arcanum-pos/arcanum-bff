@@ -46,7 +46,7 @@ export interface IconRef {
 // `<org>/<slot>` (a pairing link's `icon`), or null.
 export function iconRef(value: string | null): IconRef | null {
   const [org, slot, more] = (value ?? '').split('/');
-  if (more !== undefined || !org || !slot || !ORG_ID.test(org) || !(slot in DEFAULT_ICON || STATION_SLOT.test(slot))) return null;
+  if (more !== undefined || !org || !slot || !ORG_ID.test(org) || !(Object.hasOwn(DEFAULT_ICON, slot) || STATION_SLOT.test(slot))) return null;
   return { org, slot };
 }
 

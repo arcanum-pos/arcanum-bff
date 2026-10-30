@@ -8,7 +8,9 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(base64)) as Record<string, unknown>;
+    // The payload is UTF-8 (a name like "Jérôme"); atob alone gives its bytes.
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
   } catch {
     return null;
   }
