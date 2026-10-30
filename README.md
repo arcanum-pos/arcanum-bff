@@ -1,5 +1,7 @@
 # arcanum-bff
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/arcanum-pos/arcanum-bff/badge)](https://scorecard.dev/viewer/?uri=github.com/arcanum-pos/arcanum-bff)
+
 
 Backend-for-frontend for the Arcanum platform. Single front door on
 `demo.arcanum.kaboutersoft.be` (or an own instance's address): handles login
