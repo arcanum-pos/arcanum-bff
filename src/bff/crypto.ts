@@ -52,7 +52,11 @@ export async function verifyValue<T extends Record<string, unknown>>(env: Env, k
   const [body, mac, extra] = value.split('.');
   if (!body || !mac || extra !== undefined) return null;
   try {
-    const ok = await crypto.subtle.verify('HMAC', await signingKey(env), fromBase64url(mac), encoder.encode(body));
+    // Only the one encoding we wrote: a last character differing in its
+    // unused padding bits decodes to the same MAC, but isn't ours.
+    const macBytes = fromBase64url(mac);
+    if (base64url(macBytes) !== mac) return null;
+    const ok = await crypto.subtle.verify('HMAC', await signingKey(env), macBytes, encoder.encode(body));
     if (!ok) return null;
     const data = JSON.parse(decoder.decode(fromBase64url(body))) as T & { k?: string; exp?: number };
     if (data.k !== kind || typeof data.exp !== 'number' || data.exp < Date.now() / 1000) return null;

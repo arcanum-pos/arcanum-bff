@@ -93,6 +93,11 @@ describe('login', () => {
     // A tampered cookie.
     const tampered = stateOf(start).replace(/.$/, (c) => (c === 'A' ? 'B' : 'A'));
     expect((await call(`${BASE}/callback?code=c&state=${state}`, { headers: { Cookie: tampered } })).status).toBe(400);
+    // Its MAC's last character with only the unused padding bits changed (same bytes, other spelling).
+    const mac = stateOf(start).split('.').pop()!;
+    const last = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const respelled = stateOf(start).replace(/.$/, last[(last.indexOf(mac.at(-1)!) & ~3) | ((last.indexOf(mac.at(-1)!) + 1) & 3)]);
+    expect((await call(`${BASE}/callback?code=c&state=${state}`, { headers: { Cookie: respelled } })).status).toBe(400);
 
     const ok = await call(`${BASE}/callback?code=c&state=${state}`, { headers: { Cookie: stateOf(start) } });
     expect(ok.status).toBe(302);
