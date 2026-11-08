@@ -151,6 +151,19 @@ describe('app icons', () => {
     expect(((await (await call('/icons/org/org-own/waiter.webmanifest')).json()) as { name: string }).name).toBe('Bediening');
   });
 
+  // Chrome, Edge and Android offer to install a page only when its manifest
+  // has a start_url: the screen says which (`start`), a path of this site.
+  it("an org manifest with the screen's start page: its start_url and id; anything else: none", async () => {
+    const manifest = async (query: string) => (await (await call(`/icons/org/org-own/kassa.webmanifest?${query}`)).json()) as { start_url?: string; id?: string };
+    expect(await manifest('name=Kassa&start=%2Fkassa.html')).toMatchObject({ start_url: '/kassa.html', id: '/kassa.html' });
+    expect(await manifest(`start=${encodeURIComponent('/station.html?view=pickup')}`)).toMatchObject({ start_url: '/station.html?view=pickup', id: '/station.html?view=pickup' });
+    for (const odd of ['https://evil.test/', '//evil.test/', '/\\evil.test', 'kassa.html', '/kassa.html#x', '/a b', `/${'x'.repeat(200)}`]) {
+      const got = await manifest(new URLSearchParams({ start: odd }).toString());
+      expect(got.start_url, odd).toBeUndefined();
+      expect(got.id, odd).toBeUndefined();
+    }
+  });
+
   it("a pairing link with the org's icon (`icon=<org>/<slot>`): the page is sent with that organisation's icons", async () => {
     const html = await (await asDevice(page(), new URLSearchParams({ code: 'K7PM4XQ2', role: 'station', name: 'Keuken', icon: 'org-1/station-st_1' }))).text();
     expect(html).toContain('href="/icons/org/org-1/station-st_1-96.png"');
@@ -170,7 +183,7 @@ describe('app icons', () => {
     const withCookie = (cookie: string) => new Request('https://arcanum.test/console', { headers: { Cookie: cookie } });
     const html = await (await asConsole(page(), withCookie('session=x; arcanum-console-org=org-1'))).text();
     expect(html).toContain('<link rel="apple-touch-icon" href="/icons/org/org-1/console-180.png" />');
-    expect(html).toContain('<link rel="manifest" href="/icons/org/org-1/console.webmanifest?name=Console" />');
+    expect(html).toContain('<link rel="manifest" href="/icons/org/org-1/console.webmanifest?name=Console&amp;start=%2Fconsole" />');
     expect(await (await asConsole(page(), withCookie('session=x'))).text()).toBe(PAIR_HTML);
     expect(await (await asConsole(page(), withCookie('arcanum-console-org=../evil'))).text()).toBe(PAIR_HTML);
     // Its default when the org has none: the console's own set.

@@ -501,7 +501,7 @@ export async function asDevice(page: Response, params: URLSearchParams): Promise
 export async function asConsole(page: Response, request: Request): Promise<Response> {
   const ref = iconRef(`${cookieValue(request, CONSOLE_ORG_COOKIE) ?? ''}/console`);
   if (!ref) return page;
-  return withHead(page, { icon96: orgIconUrl(ref, 96), icon180: orgIconUrl(ref, 180), manifest: orgManifestUrl(ref, 'Console') });
+  return withHead(page, { icon96: orgIconUrl(ref, 96), icon180: orgIconUrl(ref, 180), manifest: orgManifestUrl(ref, 'Console', '/console') });
 }
 
 // A page with these in its head (the first of each), as sent.

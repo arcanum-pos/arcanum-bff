@@ -53,14 +53,22 @@ export function iconRef(value: string | null): IconRef | null {
 const defaultIcon = (slot: string) => DEFAULT_ICON[slot] ?? 'station';
 
 export const orgIconUrl = (ref: IconRef, size: number) => `/icons/org/${ref.org}/${ref.slot}-${size}.png`;
-export const orgManifestUrl = (ref: IconRef, name: string) => `/icons/org/${ref.org}/${ref.slot}.webmanifest?${new URLSearchParams({ name })}`;
+// `start`: the page the installed app opens (its start_url, which Chrome,
+// Edge and Android need before they offer to install it). Left out for a
+// pairing link's: that app opens on the link itself (Safari, install first).
+export const orgManifestUrl = (ref: IconRef, name: string, start?: string) =>
+  `/icons/org/${ref.org}/${ref.slot}.webmanifest?${new URLSearchParams(start ? { name, start } : { name })}`;
+
+// A start page of this site only: a path, an optional plain query, nothing else.
+const START = /^\/(?![/\\])[A-Za-z0-9._~/-]*(?:\?[A-Za-z0-9._~=&%-]*)?$/;
+export const startPath = (value: string | null): string | null => (value && value.length <= 200 && START.test(value) ? value : null);
 
 // /icons/org/… → the PNG or the manifest; null for any other path.
 export async function orgIconRoute(path: string, params: URLSearchParams, env: Env, defaultFile: (path: string) => Promise<Response>): Promise<Response | null> {
   const manifest = path.match(/^\/icons\/org\/([^/]+)\/([^/]+)\.webmanifest$/);
   if (manifest) {
     const ref = iconRef(`${manifest[1]}/${manifest[2]}`);
-    return ref ? orgManifest(ref, params.get('name')) : new Response(null, { status: 404 });
+    return ref ? orgManifest(ref, params.get('name'), startPath(params.get('start'))) : new Response(null, { status: 404 });
   }
   const png = path.match(/^\/icons\/org\/([^/]+)\/(.+)-(96|180|192|512)\.png$/);
   if (!png) return null;
@@ -86,15 +94,18 @@ async function backendIcon(env: Env, ref: IconRef, size: string): Promise<Respon
   return env.ARCANUM_BACKEND_SERVICE.fetch(new Request(`https://backend${target}`));
 }
 
-// A page of the org installed as an app: its name and the org's icons. No
-// start_url — the page it was added from; the scope the whole site. Only
-// purpose 'any': an uploaded icon may not leave the margin a maskable one needs.
-export function orgManifest(ref: IconRef, name: string | null): Response {
+// A page of the org installed as an app: its name and the org's icons; the
+// scope the whole site. With `start` its start_url (and id, so the kassa and
+// a pickup screen are two apps); without (a pairing link's): the page it was
+// added from. Only purpose 'any': an uploaded icon may not leave the margin
+// a maskable one needs.
+export function orgManifest(ref: IconRef, name: string | null, start: string | null = null): Response {
   const shown = (name ?? '').trim().slice(0, 60) || DEFAULT_NAME[ref.slot] || 'Station';
   return new Response(
     JSON.stringify({
       name: shown,
       short_name: shown,
+      ...(start ? { start_url: start, id: start } : {}),
       scope: '/',
       display: 'standalone',
       background_color: '#ffffff',
