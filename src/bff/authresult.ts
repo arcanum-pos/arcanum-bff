@@ -13,16 +13,19 @@ export async function authresult(request: Request, env: Env, sessionStore: Sessi
 
     if (validateSessionData(sessionData)) {
       if (isTokenExpiringSoon(sessionData.expires_at, 30)) {
-        const refreshed = await refreshUserToken(sessionData, sessionId, sessionStore, env);
-        // Refused, or failed: maybe another request of this browser just
-        // refreshed it (the kassa fires several at once) — then the session
-        // in KV already holds the new tokens.
-        const latest = await getSessionData(sessionStore, sessionId);
-        const refreshedElsewhere = validateSessionData(latest) && latest.access_token !== sessionData.access_token && !isTokenExpiringSoon(latest.expires_at, 0);
-        if (!refreshed && !refreshedElsewhere) {
-          return { type: 'user', data: 'token refresh failed', token: '', authMethod: 'public' };
+        const outcome = await refreshUserToken(sessionData, sessionId, sessionStore, env);
+        // Refused: maybe another request of this browser just refreshed it
+        // (the kassa fires several at once) — then the session in KV already
+        // holds the new tokens. Unreachable (offline, OFFLINE.md): the
+        // session goes on as it is; only a real refusal signs out.
+        if (outcome !== 'unreachable') {
+          const latest = await getSessionData(sessionStore, sessionId);
+          const refreshedElsewhere = validateSessionData(latest) && latest.access_token !== sessionData.access_token && !isTokenExpiringSoon(latest.expires_at, 0);
+          if (outcome === 'refused' && !refreshedElsewhere) {
+            return { type: 'user', data: 'token refresh failed', token: '', authMethod: 'public' };
+          }
+          sessionData = latest;
         }
-        sessionData = latest;
       }
 
       if (validateSessionData(sessionData)) {

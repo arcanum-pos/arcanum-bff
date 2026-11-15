@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
 import { CloudflareKVSessionStore } from '../src/adapters/kv_session_store';
 import type { SessionData } from '../src/types';
+import { resetRefreshBackoff } from '../src/bff/refresh';
 
 const BASE = 'https://arcanum.test';
 
@@ -41,6 +42,7 @@ function mockProvider(opts: { refresh?: (body: URLSearchParams) => Response | Pr
 }
 afterEach(() => {
   vi.restoreAllMocks();
+  resetRefreshBackoff();
   outbound.length = 0;
 });
 
@@ -185,7 +187,30 @@ describe('token refresh', () => {
     expect((await call(`${BASE}/whoami`, { headers: { Cookie: `__Host-session_id=${id}` } })).status).toBe(200);
   });
 
+  it('an unreachable login provider (offline) keeps the session; only a refusal ends it', async () => {
+    resetRefreshBackoff();
+    const id = await storeSession({ expires_at: Date.now() / 1000 + 5 });
+    const cookie = { headers: { Cookie: `__Host-session_id=${id}` } };
+    mockProvider({ refresh: () => Promise.reject(new TypeError('fetch failed: getaddrinfo ENOTFOUND login.test')) });
+    expect((await call(`${BASE}/whoami`, cookie)).status).toBe(200);
+    // Asked again only after a while, not on every request.
+    const asked = outbound.filter((u) => u === 'https://login.test/token').length;
+    expect((await call(`${BASE}/whoami`, cookie)).status).toBe(200);
+    expect(outbound.filter((u) => u === 'https://login.test/token').length).toBe(asked);
+
+    resetRefreshBackoff();
+    vi.restoreAllMocks();
+    mockProvider({ refresh: () => new Response('down', { status: 503 }) });
+    expect((await call(`${BASE}/whoami`, cookie)).status).toBe(200);
+
+    resetRefreshBackoff();
+    vi.restoreAllMocks();
+    mockProvider({ refresh: () => Response.json({ error: 'invalid_grant' }, { status: 400 }) });
+    expect((await call(`${BASE}/whoami`, cookie)).status).toBe(401);
+  });
+
   it('a refused refresh with nothing newer still signs out', async () => {
+    resetRefreshBackoff();
     const id = await storeSession({ expires_at: Date.now() / 1000 + 5 });
     mockProvider({ refresh: () => Response.json({ error: 'invalid_grant' }, { status: 400 }) });
     expect((await call(`${BASE}/whoami`, { headers: { Cookie: `__Host-session_id=${id}` } })).status).toBe(401);

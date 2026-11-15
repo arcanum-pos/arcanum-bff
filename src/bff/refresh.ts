@@ -13,27 +13,49 @@ export function isTokenExpiringSoon(expiresAt: number, secondsThreshold = 30): b
   return Date.now() / 1000 + secondsThreshold >= expiresAt;
 }
 
+// 'refused': the provider said no (or there's nothing to refresh with) -
+// the session ends. 'unreachable': no answer from the provider (offline, a
+// local box without internet - OFFLINE.md, or the provider down) - the
+// session stays as it is and is refreshed once the provider answers again.
+export type RefreshOutcome = 'ok' | 'refused' | 'unreachable';
+
+// After an unreachable provider, this isolate/process doesn't ask again for
+// a minute: every request would otherwise wait for the same timeout.
+const RETRY_AFTER_MS = 60_000;
+const TIMEOUT_MS = 5_000;
+let unreachableUntil = 0;
+
+export function resetRefreshBackoff() {
+  unreachableUntil = 0;
+}
+
 export async function refreshUserToken(
   sessionData: SessionData,
   sessionId: string,
   sessionStore: SessionStore,
   env: Env
-): Promise<boolean> {
+): Promise<RefreshOutcome> {
   const refreshToken = sessionData.refresh_token;
   if (!refreshToken) {
     console.error('No refresh token available');
-    return false;
+    return 'refused';
   }
+  if (Date.now() < unreachableUntil) return 'unreachable';
+  const unreachable = (why: unknown): RefreshOutcome => {
+    console.error('Login provider unreachable for a token refresh', why);
+    unreachableUntil = Date.now() + RETRY_AFTER_MS;
+    return 'unreachable';
+  };
 
   // Refresh must use the same client the session was created with (a
   // provider like Google has one per flow). `?? 'authcode'` covers a session
   // created before authPurpose existed: at the time, every flow used the
   // one primary client, exactly what 'authcode' still resolves to without
   // an auth_code_client_id override configured.
-  const idp = await resolveIdpSettings(env, sessionData.authPurpose ?? 'authcode');
-
+  let response: Response;
   try {
-    const response = await fetch(idp.endpoints.tokenEndpoint, {
+    const idp = await resolveIdpSettings(env, sessionData.authPurpose ?? 'authcode');
+    response = await fetch(idp.endpoints.tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -42,25 +64,30 @@ export async function refreshUserToken(
         client_id: idp.clientId,
         client_secret: idp.clientSecret,
       }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
+  } catch (err) {
+    return unreachable(err);
+  }
 
-    if (!response.ok) {
-      console.error('Refresh failed', await response.text());
-      return false;
-    }
+  // A 5xx or a rate limit is the provider not answering, not a refusal.
+  if (response.status >= 500 || response.status === 429) return unreachable(`HTTP ${response.status}`);
+  if (!response.ok) {
+    console.error('Refresh failed', await response.text());
+    return 'refused';
+  }
 
+  try {
     const tokens = (await response.json()) as { access_token: string; refresh_token?: string; expires_in: number };
-
     await sessionStore.set(sessionId, {
       ...sessionData,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token ?? sessionData.refresh_token,
       expires_at: Date.now() / 1000 + tokens.expires_in,
     } satisfies SessionData);
-
-    return true;
+    return 'ok';
   } catch (err) {
-    console.error('Refresh request error', err);
-    return false;
+    console.error('Refresh response error', err);
+    return 'refused';
   }
 }
