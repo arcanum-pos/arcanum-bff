@@ -5,6 +5,7 @@ import { DeviceRoutesHandler } from './bff/deviceroutes';
 import { authresult } from './bff/authresult';
 import { processWhoAmi } from './bff/whoami';
 import { forwardToInstaller, installerAvailable, isInstallerPath } from './bff/installer';
+import { forwardSync, isSyncPath } from './bff/sync';
 import { Router, isKnownApiRoute, routeAllowsDevice, routeRequiresAuth } from './routes/router';
 import { buildDeviceCookie, cookieValue, deviceKeyFrom, isDevelopment, LEGACY_SESSION_COOKIE, sessionCookieName } from './bff/cookie';
 
@@ -103,6 +104,9 @@ async function handle(request: Request, env: Env, _ctx: ExecutionContext): Promi
     if (isScannedPath(path) && !isInstallerPath(path)) {
       return new Response(null, { status: 404 });
     }
+
+    // A local box's offline sync (bff/sync.ts): its own key, no session.
+    if (isSyncPath(path)) return forwardSync(request, env);
 
     // Unknown /api/* paths are rejected before any auth work — route table is static and known.
     if (path.startsWith('/api') && !isKnownApiRoute(path)) {
