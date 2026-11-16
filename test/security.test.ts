@@ -191,7 +191,7 @@ describe('token refresh', () => {
     resetRefreshBackoff();
     const id = await storeSession({ expires_at: Date.now() / 1000 + 5 });
     const cookie = { headers: { Cookie: `__Host-session_id=${id}` } };
-    mockProvider({ refresh: () => Promise.reject(new TypeError('fetch failed: getaddrinfo ENOTFOUND login.test')) });
+    mockProvider({ refresh: () => { throw new TypeError('fetch failed: getaddrinfo ENOTFOUND login.test'); } });
     expect((await call(`${BASE}/whoami`, cookie)).status).toBe(200);
     // Asked again only after a while, not on every request.
     const asked = outbound.filter((u) => u === 'https://login.test/token').length;
